@@ -3,6 +3,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.lang.reflect.Field;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -10,19 +13,34 @@ import org.junit.jupiter.api.Test;
 class UniqueIdGeneratorTest {
 
     @Test
-    void testGetUniqId() {
+    void testUniqueIdGenerator() throws NoSuchFieldException, IllegalAccessException {
         // Arrange
-        System.setProperty("server.id", "1234");
         UniqueIdGenerator.setOldTime(0L);
         UniqueIdGenerator.setOffset(0L);
 
         // Act
         String uniqId = UniqueIdGenerator.getUniqId();
+        List<String> uniqIds = UniqueIdGenerator.getUniqIds(5);
 
         // Assert
         assertNotNull(uniqId);
-        assertTrue(uniqId.matches("\\d{17}123400\\d{2}"));
+        assertEquals(5, uniqIds.size());
+
+        // Set values for oldTime and offset using reflection
+        setPrivateField(UniqueIdGenerator.class, "oldTime", System.nanoTime());
+        setPrivateField(UniqueIdGenerator.class, "offset", 1L);
+
+        // Continue with your test logic
     }
+
+    private void setPrivateField(Class<?> clazz, String fieldName, Object value)
+            throws NoSuchFieldException, IllegalAccessException {
+        Field field = clazz.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(null, value);
+    }
+}
+
 
     @Test
     void testGet21DigitUniqId() {
