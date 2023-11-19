@@ -1,69 +1,87 @@
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.powermock.api.mockito.PowerMockito.mockStatic;
+import org.mockito.MockitoAnnotations;
 
-@ExtendWith(MockitoExtension.class)
-@PrepareForTest({HttpCallDao.class, HttpClient.class, GetMethod.class})
 class HttpCallDaoTest {
 
-    @InjectMocks
-    private HttpCallDao httpCallDao;
+    @Mock
+    private HttpClient httpClientMock;
 
     @Mock
-    private HttpClient httpClient;
+    private GetMethod getMethodMock;
 
-    @Test
-    void testCallHttpGet() throws Exception {
-        // Mocking
-        mockStatic(HttpClient.class);
-        PowerMockito.whenNew(HttpClient.class).withNoArguments().thenReturn(httpClient);
-        GetMethod httpMethodMock = PowerMockito.mock(GetMethod.class);
-        PowerMockito.whenNew(GetMethod.class).withArguments(any(String.class)).thenReturn(httpMethodMock);
-        PowerMockito.when(httpMethodMock.getStatusCode()).thenReturn(200);
-        PowerMockito.when(httpMethodMock.getResponseBodyAsString()).thenReturn("Mocked response");
+    @Mock
+    private PostMethod postMethodMock;
 
-        // Test
-        String result = httpCallDao.callHttpGet("http://example.com", "queryData");
-
-        // Verify
-        verify(httpClient, times(1)).executeMethod(httpMethodMock);
-        // Add more verifications based on your requirements
-
-        // Assertions
-        // Add assertions based on your requirements
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
     }
 
-    // Add more test methods for other methods in HttpCallDao
-}
-
-
     @Test
-    void testCallHttpPost() throws Exception {
-        // Mocking
-        when(httpClient.executeMethod(any())).thenReturn(200);
-        when(httpClient.getResponseBodyAsString()).thenReturn("Mocked response");
+    void testCallHttpGet_Success() throws Exception {
+        // Arrange
+        String urlString = "http://example.com";
+        String queryData = "param=value";
+        int timeout = 5000;
+        String responseBody = "Mocked HTTP response";
 
-        // Test
-        String result = httpCallDao.callHttpPost("http://example.com", "data");
+        when(httpClientMock.executeMethod(any())).thenReturn(200);
+        when(httpClientMock.getResponseBodyAsString()).thenReturn(responseBody);
 
-        // Verify
-        verify(httpClient, times(1)).executeMethod(any());
-        verify(httpClient, times(1)).getResponseBodyAsString();
-        // Add more verifications based on your requirements
+        // Act
+        String result = HttpCallDao.callHttpGet(urlString, queryData, timeout);
 
-        // Assertions
-        // Add assertions based on your requirements
+        // Assert
+        assertEquals(responseBody, result);
+        verify(httpClientMock).executeMethod(any());
     }
 
-    // Add more test methods for other methods in HttpCallDao
+    @Test
+    void testCallHttpPost_Success() throws Exception {
+        // Arrange
+        String urlString = "http://example.com";
+        String data = "param=value";
+        String responseBody = "Mocked HTTP response";
+
+        when(httpClientMock.executeMethod(any())).thenReturn(200);
+        when(httpClientMock.getResponseBodyAsString()).thenReturn(responseBody);
+
+        // Act
+        String result = HttpCallDao.callHttpPost(urlString, data);
+
+        // Assert
+        assertEquals(responseBody, result);
+        verify(httpClientMock).executeMethod(any());
+    }
+
+    @Test
+    void testCallHttpPostWithMap_Success() throws Exception {
+        // Arrange
+        String urlString = "http://example.com";
+        StringRequestEntity stringRequestEntity = new StringRequestEntity("param=value", "text/plain", "UTF-8");
+        String responseBody = "Mocked HTTP response";
+
+        when(httpClientMock.executeMethod(any())).thenReturn(200);
+        when(httpClientMock.getResponseBodyAsString()).thenReturn(responseBody);
+
+        // Act
+        String result = HttpCallDao.callHTTPBodyPost(urlString, stringRequestEntity, 5000);
+
+        // Assert
+        assertEquals(responseBody, result);
+        verify(httpClientMock).executeMethod(any());
+    }
 }
