@@ -8,26 +8,20 @@ import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.StringRequestEntity;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 class HttpCallDaoTest {
 
-    @Mock
     private HttpClient httpClientMock;
-
-    @Mock
     private GetMethod getMethodMock;
-
-    @Mock
     private PostMethod postMethodMock;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        httpClientMock = mock(HttpClient.class);
+        getMethodMock = mock(GetMethod.class);
+        postMethodMock = mock(PostMethod.class);
     }
 
     @Test
