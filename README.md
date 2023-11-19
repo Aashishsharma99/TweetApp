@@ -1,62 +1,105 @@
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+package com.vzw.cc.util;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import java.util.ArrayList;
+import java.util.List;
 
-class HttpCallerTest {
+import org.springframework.stereotype.Component;
 
-    @Mock
-    private HttpCallDao httpCallDaoMock;
+@Component
+public class UniqueIdGenerator
+{
+  private static long oldTime = 0L;
+  private static long offset = 0L;
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
+  
+  private static List<String> getUniqId(int totalUniqNosNeeded) {
+    String currTime = String.valueOf(System.currentTimeMillis());
+    String currThread = Thread.currentThread().getName();
+    
+    String serverId = System.getProperty("server.id");
+    
+    serverId = getLastTwoDigits(serverId);
+    currThread = getLastTwoDigits(currThread);
+    List<String> uniqIds = new ArrayList<String>();
+    
+    for (int index = 0; index < totalUniqNosNeeded; index++) {
+      
+      if (System.currentTimeMillis() != oldTime) {
+        
+        currTime = String.valueOf(System.currentTimeMillis());
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + "00");
+        offset = 1L;
+        oldTime = System.currentTimeMillis();
+      } else {
+        
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + ((offset % 10L == offset) ? ("0" + offset) : String.valueOf(offset)));
+        offset++;
+      } 
+    } 
+    
+    return uniqIds;
+  }
 
-    @Test
-    void testMakeCall_Success() throws Exception {
-        // Arrange
-        String urlString = "http://example.com";
-        String data = "param=value";
-        String expectedResponse = "Mocked HTTP response";
+  
+  private static List<String> get21DigitUniqId(int totalUniqNosNeeded) {
+    String currTime = String.valueOf(System.nanoTime());
+    String currThread = Thread.currentThread().getName();
+    
+    String serverId = System.getProperty("server.id");
+    
+    serverId = getLastTwoDigits(serverId);
+    currThread = getLastTwoDigits(currThread);
+    List<String> uniqIds = new ArrayList<String>();
+    
+    for (int index = 0; index < totalUniqNosNeeded; index++) {
+      
+      if (System.nanoTime() != oldTime) {
+        
+        currTime = String.valueOf(System.nanoTime());
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + "00");
+        offset = 1L;
+        oldTime = System.nanoTime();
+      } else {
+        
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + ((offset % 10L == offset) ? ("0" + offset) : String.valueOf(offset)));
+        offset++;
+      } 
+    } 
+    
+    return uniqIds;
+  }
 
-        when(httpCallDaoMock.callHttpPost(any(), any())).thenReturn(expectedResponse);
+  
+  private static String getLastTwoDigits(String id) {
+    if (id != null && Character.isDigit(id.charAt(id.length() - 1))) {
+      if (Character.isDigit(id.charAt(id.length() - 2))) {
+        return id.substring(id.length() - 2);
+      }
+      return "0" + id.substring(id.length() - 1);
+    } 
+    return "00";
+  }
 
-        // Act
-        String result = HttpCaller.makeCall(urlString, data);
 
-        // Assert
-        assertEquals(expectedResponse, result);
-        verify(httpCallDaoMock).callHttpPost(urlString, data);
-    }
+  
+  public static String getUniqId() { return (String)getUniqId(1).get(0); }
 
-    @Test
-    void testMakeCallOld_Success() throws Exception {
-        // Arrange
-        String urlString = "http://example.com";
-        String data = "param=value";
-        String expectedResponse = "Mocked HTTP response";
 
-        // Mock URL and URLConnection, as they are not directly injected
-        URL urlMock = mock(URL.class);
-        URLConnection urlConnectionMock = mock(URLConnection.class);
 
-        when(urlMock.openConnection()).thenReturn(urlConnectionMock);
-        when(urlConnectionMock.getOutputStream()).thenReturn(System.out);
+  
+  public static String get21DigitUniqId() { return (String)get21DigitUniqId(1).get(0); }
 
-        when(httpCallDaoMock.callHttpPost(any(), any())).thenReturn(expectedResponse);
 
-        // Act
-        String result = HttpCaller.makeCallOld(urlString, data);
 
-        // Assert
-        assertEquals(expectedResponse, result);
-        verify(httpCallDaoMock).callHttpPost(urlString, data);
-    }
+  
+  public static List<String> getUniqIds(int totalUniqNosNeeded) { return getUniqId(totalUniqNosNeeded); }
+
+  
+  public static void main(String[] args) {
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+  }
 }
