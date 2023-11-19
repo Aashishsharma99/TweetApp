@@ -1,62 +1,92 @@
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.jupiter.api.BeforeEach;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-class HttpCallerTest {
+class UniqueIdGeneratorTest {
 
-    @Mock
-    private HttpCallDao httpCallDaoMock;
+    @Test
+    void testGetUniqId() {
+        // Arrange
+        System.setProperty("server.id", "1234");
+        UniqueIdGenerator.setOldTime(0L);
+        UniqueIdGenerator.setOffset(0L);
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+        // Act
+        String uniqId = UniqueIdGenerator.getUniqId();
+
+        // Assert
+        assertNotNull(uniqId);
+        assertTrue(uniqId.matches("\\d{17}123400\\d{2}"));
     }
 
     @Test
-    void testMakeCall_Success() throws Exception {
+    void testGet21DigitUniqId() {
         // Arrange
-        String urlString = "http://example.com";
-        String data = "param=value";
-        String expectedResponse = "Mocked HTTP response";
-
-        when(httpCallDaoMock.callHttpPost(any(), any())).thenReturn(expectedResponse);
+        System.setProperty("server.id", "5678");
+        UniqueIdGenerator.setOldTime(0L);
+        UniqueIdGenerator.setOffset(0L);
 
         // Act
-        String result = HttpCaller.makeCall(urlString, data);
+        String uniqId = UniqueIdGenerator.get21DigitUniqId();
 
         // Assert
-        assertEquals(expectedResponse, result);
-        verify(httpCallDaoMock).callHttpPost(urlString, data);
+        assertNotNull(uniqId);
+        assertTrue(uniqId.matches("\\d{18}567800\\d{2}"));
     }
 
     @Test
-    void testMakeCallOld_Success() throws Exception {
+    void testGetUniqIds() {
         // Arrange
-        String urlString = "http://example.com";
-        String data = "param=value";
-        String expectedResponse = "Mocked HTTP response";
-
-        // Mock URL and URLConnection, as they are not directly injected
-        URL urlMock = mock(URL.class);
-        URLConnection urlConnectionMock = mock(URLConnection.class);
-
-        when(urlMock.openConnection()).thenReturn(urlConnectionMock);
-        when(urlConnectionMock.getOutputStream()).thenReturn(System.out);
-
-        when(httpCallDaoMock.callHttpPost(any(), any())).thenReturn(expectedResponse);
+        System.setProperty("server.id", "9012");
+        UniqueIdGenerator.setOldTime(0L);
+        UniqueIdGenerator.setOffset(0L);
+        int totalUniqNosNeeded = 3;
 
         // Act
-        String result = HttpCaller.makeCallOld(urlString, data);
+        List<String> uniqIds = UniqueIdGenerator.getUniqIds(totalUniqNosNeeded);
 
         // Assert
-        assertEquals(expectedResponse, result);
-        verify(httpCallDaoMock).callHttpPost(urlString, data);
+        assertNotNull(uniqIds);
+        assertEquals(totalUniqNosNeeded, uniqIds.size());
+        assertTrue(uniqIds.get(0).matches("\\d{17}901200\\d{2}"));
+        assertTrue(uniqIds.get(1).matches("\\d{17}901201\\d{2}"));
+        assertTrue(uniqIds.get(2).matches("\\d{17}901202\\d{2}"));
+    }
+
+    @Test
+    void testMainMethod() {
+        // Mock System.out to capture the printed output
+        System.setOut(new java.io.PrintStream(System.out) {
+            private StringBuilder output = new StringBuilder();
+
+            @Override
+            public void println(String x) {
+                output.append(x).append(System.lineSeparator());
+            }
+
+            public String getOutput() {
+                return output.toString();
+            }
+        });
+
+        // Arrange
+        System.setProperty("server.id", "3456");
+
+        // Act
+        UniqueIdGenerator.main(new String[] {});
+
+        // Assert
+        String output = ((java.io.PrintStream) System.out).getOutput();
+        assertNotNull(output);
+        assertTrue(output.matches("\\d{17}345600\\d{2}" + System.lineSeparator() +
+                                 "\\d{17}345601\\d{2}" + System.lineSeparator() +
+                                 "\\d{17}345602\\d{2}" + System.lineSeparator() +
+                                 "\\d{17}345603\\d{2}" + System.lineSeparator() +
+                                 "\\d{17}345604\\d{2}" + System.lineSeparator()));
     }
 }
