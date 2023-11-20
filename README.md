@@ -1,147 +1,170 @@
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+package com.verizon.onemsg.omppservice.dao;
 
-import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Base64;
+import java.util.Date;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.jms.core.JmsTemplate;
-import org.springframework.ui.ModelMap;
-import org.springframework.web.servlet.ModelAndView;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+import org.springframework.util.SerializationUtils;
 
-@ExtendWith(MockitoExtension.class)
-class OMPPSericeControllerTest {
+import com.verizon.onemsg.omppservice.constants.AppConstants;
+import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.vzw.cc.util.UniqueIdGenerator;
+import com.vzw.cc.valueobjects.AuditInfo;
 
-    @Mock
-    private RabbitTemplate rabbitTemplate;
+@Component
+public class CommonAuditDao {
+	
+	private static Logger log = LogManager.getLogger(CommonAuditDao.class.getName());
+	
+	@Value("${APP_ID}")
+	String appId;
+	
+	@Value("${PC_ADMIN_AUDIT_DATE_FORMAT}")
+	String pcAdminDateFormat;
+	
+	@Value("${RMQ_AUDIT_EXCHANGE}")
+	String auditExchange;
+	
+	@Value("${RMQ_OMPPS_PCADMIN_ROUTING_KEY}")
+	String pcRoutingKey;
+	
+	/*@Value("${RMQ_PCADMIN_AUDIT_QUEUE}")
+	String pcadminQueueName;*/
+	
+	//@Autowired
+	RabbitTemplate pcauditRabbitTemplate;
+	
+	@Autowired
+	AppProperties props ;
+	
+	@Autowired
+	OmppsDataManager dataManager;
+	
+	/*private CommonAuditDao() 
+		
+	}*/
+	
+	public CommonAuditDao(@Lazy RabbitTemplate pcauditRabbitTemplate){
+		this.pcauditRabbitTemplate = pcauditRabbitTemplate;
+	}
+	
 
-    @Mock
-    private JmsTemplate jmsTemplate;
+	public AuditInfo createAuditMap(String reqXML, String clientId, String service){
+		AuditInfo auditInfo = new AuditInfo(Long.valueOf(UniqueIdGenerator.getUniqId()));
+		auditInfo.setReqInput(reqXML);
+		auditInfo.setGeneralInfo(appId, service,  getAuditDate());
+		auditInfo.setClient_id(clientId);
+		auditInfo.setServer(System.getProperty(AppConstants.SERVERID));
+		return auditInfo;
+	}
 
-    @Mock
-    private CacheManager cacheManager;
+	public void updateAuditMap(AuditInfo auditInfo , String mdn, String custId, String accNo, String sfoId){
+		
+		auditInfo.setCust_id(custId);
+		auditInfo.setNotification_address(mdn);
+		auditInfo.setAcct_no(accNo);
+		auditInfo.setTrns_type(sfoId);			
+	}
+	public void updateAuditMap(AuditInfo auditInfo, String status){	
+			
+		auditInfo.setStatus(status);
+		auditInfo.setResponse_TS(getAuditDate());
+		
+		try {
+			SimpleDateFormat sdf = new SimpleDateFormat(
+					props.getProperty((AppConstants.PC_ADMIN_AUDIT_DATE_FORMAT),"MMM-dd-yyyy HH:mm:ss"));
+			auditInfo.setResponse_time(System.currentTimeMillis() - sdf.parse(auditInfo.getResponse_TS()).getTime());
+		} catch (ParseException e) {
+			log.warn("unable to parse response time for audit", e);
+		}
+		
+	}
+	
+	public void submitAduitMessage(AuditInfo auditInfo){
+		try {
+			log.info("Sending to PC admin custid ::"+auditInfo.getCust_id() +"AccountNo :: "+ auditInfo.getAcct_no());
+			log.info("Message send to ****** "+auditExchange+"***Routing Key****"+pcRoutingKey);
+			byte [] auditData = SerializationUtils.serialize(auditInfo);
+			log.info("Size of the code ::"+auditData.length);
+			pcauditRabbitTemplate.convertAndSend(auditExchange, pcRoutingKey, auditData);
+			
+		} catch (Exception e) {
+			log.error("Sending Auditing Message", "CommonAuditing", "submitAduitMessage", e.getMessage(), "Error", e);
+		}
+	}
+	
+	public  void submitAduitMessage(AuditInfo auditInfo, String status){
+		try {
+			log.info("Sending audit request to Audit Q:" + props.getProperty(AppConstants.AUDIT_Q_NAME));
+			updateAuditMap(auditInfo, status);
+			submitAduitMessage(auditInfo);
+		} catch (Exception e) {
+			log.error("Sending Auditing Message", "CommonAuditing", "submitAduitMessage", e.getMessage(), "Error", e);
+		}		
+		
+	}
+	
+	
+	public static String encodeObj(Object obj)  throws Exception{
 
-    @Mock
-    private Cache cache;
+		ByteArrayOutputStream bo = new ByteArrayOutputStream();
+		ObjectOutputStream oo = new ObjectOutputStream(bo);
+		oo.writeObject(obj);
+		oo.flush();
+		String encodedMsg = Base64.getEncoder().encodeToString(bo.toByteArray()); 
+		return encodedMsg;
+	}
+	
+	public String getAuditDate() {
+		
+		SimpleDateFormat sdf = new SimpleDateFormat(
+				props.getProperty((AppConstants.PC_ADMIN_AUDIT_DATE_FORMAT),"MMM-dd-yyyy HH:mm:ss"));
+		return sdf.format(new Date());
+	}
 
-    @InjectMocks
-    private OMPPSericeController omppSericeController;
+	
+	/*public static void updateActivationAudit(ClientActivity ca){
+		
+		log.info("inside CommonAuditing::updateActivationAudit : for MDN:"+ ca.getMdn());
+		Connection conn = null;
+		PreparedStatement st = null;
+		ResultSet rs = null;
+		try{			
+			conn = JdbcDao.getDMDBConnection();
+			st = conn.prepareStatement(DaoConstants.INSERT_OM_ACTIVATION_AUDIT);
+			st.setString(1, ca.getCustomerId()+"");
+			st.setString(2, ca.getAccountNumber()+"");
+			st.setString(3, ca.getMdn()+"");
+			st.setString(4, ca.getStatus());
+			st.setString(5, ca.getDeviceId());
+			st.setString(6, ca.getDeviceMake());
+			st.setString(7, ca.getDeviceModel());
+			st.setString(8, ca.getBillingSystem());
+			st.setString(9, ca.getTransactionId());
+			
+			
+			rs = st.executeQuery();	
+			
+		}catch (Exception e){
+			log.error("Inerting Into om_activation_audit", "CommonAuditing", "updateActivationAudit", e.getMessage(), "Error", e);
+		}finally{
+			try {
+				JdbcDao.closeConnection(conn, rs, st);
+			} catch (SQLException e) {
+				log.error("Connection Closing", "PromoCodeHelper", "updatePromoCode", e.getMessage(), "Error", e);
+			}
+		}
+	}*/
 
-    @Test
-    void testStatus() {
-        // Act
-        String result = omppSericeController.status();
-
-        // Assert
-        assertEquals("Success", result);
-    }
-
-    @Test
-    void testPostToSepQueueString_Success() {
-        // Arrange
-        String xmlreqdoc = "<xml>test</xml>";
-        String routeKey = "testRoute";
-
-        // Act
-        String actualResponse = omppSericeController.postToSepQueueString(xmlreqdoc, xmlreqdoc, routeKey);
-
-        // Assert
-        assertEquals("Success", actualResponse);
-        verify(rabbitTemplate, times(1)).convertAndSend(any(), any(), any());
-    }
-
-    @Test
-    void testPostToSepQueueString_Failure() {
-        // Act
-        String actualResponse = omppSericeController.postToSepQueueString(null, null, null);
-
-        // Assert
-        assertEquals("Failure !!! XML and routingkey is mandatory", actualResponse);
-        verify(rabbitTemplate, never()).convertAndSend(any(), any(), any());
-    }
-
-    @Test
-    void testPostToLegacyQueue_Success() {
-        // Arrange
-        String xmlreqdoc = "<xml>test</xml>";
-        String queueName = "testQueue";
-
-        // Act
-        String actualResponse = omppSericeController.postToLegacyQueue(xmlreqdoc, xmlreqdoc, queueName);
-
-        // Assert
-        assertEquals("Success", actualResponse);
-        verify(jmsTemplate, times(1)).convertAndSend(any(), any());
-    }
-
-    @Test
-    void testPostToLegacyQueue_Failure() {
-        // Act
-        String actualResponse = omppSericeController.postToLegacyQueue(null, null, null);
-
-        // Assert
-        assertEquals("Failure !!! XML and Queuename is mandatory", actualResponse);
-        verify(jmsTemplate, never()).convertAndSend(any(), any());
-    }
-
-    @Test
-    void testPostingToQueue() {
-        // Act
-        ModelAndView result = omppSericeController.postingToQueue(new ModelMap());
-
-        // Assert
-        assertEquals("TestVisionActivity", result.getViewName());
-    }
-
-    @Test
-    void testPostingToQueueJsp() {
-        // Act
-        ModelAndView result = omppSericeController.PostingToQueue();
-
-        // Assert
-        assertEquals("TestVisionActivity", result.getViewName());
-    }
-
-    @Test
-    void testPostingToLegacyQueueJsp() {
-        // Act
-        ModelAndView result = omppSericeController.PostingToLegacyQueue();
-
-        // Assert
-        assertEquals("LegacyQActivity", result.getViewName());
-    }
-
-    @Test
-    void testClearCacheByname_Success() {
-        // Arrange
-        String cacheName = "testCache";
-
-        when(cacheManager.getCache(cacheName)).thenReturn(cache);
-
-        // Act
-        String actualResponse = omppSericeController.clearCacheByname(cacheName);
-
-        // Assert
-        assertEquals("Success", actualResponse);
-        verify(cache, times(1)).clear();
-    }
-
-    @Test
-    void testClearCacheByname_CacheNotFound() {
-        // Arrange
-        String cacheName = "nonexistentCache";
-
-        when(cacheManager.getCache(cacheName)).thenReturn(null);
-
-        // Act
-        String actualResponse = omppSericeController.clearCacheByname(cacheName);
-
-        // Assert
-        assertEquals("Success", actualResponse); // It should still return "Success" as there is no cache to clear
-        verify(cache, never()).clear();
-    }
+	
 }
