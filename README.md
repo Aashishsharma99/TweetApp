@@ -2,14 +2,19 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import java.text.ParseException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.SerializationUtils;
 
 import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.vzw.cc.util.UniqueIdGenerator;
 import com.vzw.cc.valueobjects.AuditInfo;
 
 class CommonAuditDaoTest {
@@ -19,9 +24,6 @@ class CommonAuditDaoTest {
 
     @Mock
     private AppProperties appProperties;
-
-    @Mock
-    private OmppsDataManager dataManager;
 
     @InjectMocks
     private CommonAuditDao commonAuditDao;
@@ -38,6 +40,10 @@ class CommonAuditDaoTest {
         String clientId = "testClientId";
         String service = "testService";
 
+        // Mocking
+        when(appProperties.getProperty(anyString(), anyString())).thenReturn("MMM-dd-yyyy HH:mm:ss");
+        when(pcauditRabbitTemplate.convertAndSend(anyString(), anyString(), any(byte[].class))).thenReturn(null);
+
         // Act
         AuditInfo auditInfo = commonAuditDao.createAuditMap(reqXML, clientId, service);
 
@@ -45,8 +51,9 @@ class CommonAuditDaoTest {
         assertNotNull(auditInfo);
         assertEquals(reqXML, auditInfo.getReqInput());
         assertEquals(clientId, auditInfo.getClient_id());
-        assertEquals(appProperties.getProperty("APP_ID"), auditInfo.getApp_id());
+        assertEquals("APP_ID", auditInfo.getApp_id());
         assertEquals(service, auditInfo.getService());
+        assertNotNull(auditInfo.getServer());
     }
 
     @Test
@@ -69,22 +76,30 @@ class CommonAuditDaoTest {
     }
 
     @Test
-    void testUpdateAuditMapWithStatus() {
+    void testUpdateAuditMapWithStatus() throws ParseException {
         // Arrange
         AuditInfo auditInfo = new AuditInfo();
         String status = "testStatus";
+
+        // Mocking
+        when(appProperties.getProperty(anyString(), anyString())).thenReturn("MMM-dd-yyyy HH:mm:ss");
 
         // Act
         commonAuditDao.updateAuditMap(auditInfo, status);
 
         // Assert
         assertEquals(status, auditInfo.getStatus());
+        assertNotNull(auditInfo.getResponse_TS());
+        assertNotNull(auditInfo.getResponse_time());
     }
 
     @Test
     void testSubmitAuditMessage() {
         // Arrange
         AuditInfo auditInfo = new AuditInfo();
+
+        // Mocking
+        when(pcauditRabbitTemplate.convertAndSend(anyString(), anyString(), any(byte[].class))).thenReturn(null);
 
         // Act
         commonAuditDao.submitAduitMessage(auditInfo);
@@ -98,6 +113,10 @@ class CommonAuditDaoTest {
         // Arrange
         AuditInfo auditInfo = new AuditInfo();
         String status = "testStatus";
+
+        // Mocking
+        when(pcauditRabbitTemplate.convertAndSend(anyString(), anyString(), any(byte[].class))).thenReturn(null);
+        when(appProperties.getProperty(anyString(), anyString())).thenReturn("MMM-dd-yyyy HH:mm:ss");
 
         // Act
         commonAuditDao.submitAduitMessage(auditInfo, status);
@@ -120,6 +139,9 @@ class CommonAuditDaoTest {
 
     @Test
     void testGetAuditDate() {
+        // Mocking
+        when(appProperties.getProperty(anyString(), anyString())).thenReturn("MMM-dd-yyyy HH:mm:ss");
+
         // Act
         String auditDate = commonAuditDao.getAuditDate();
 
