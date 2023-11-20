@@ -1,112 +1,147 @@
-package com.verizon.onemsg.omppservice.controller;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-import javax.jms.DeliveryMode;
-
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.ui.ModelMap;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.ibm.mq.jms.MQQueue;
-import com.ibm.msg.client.wmq.WMQConstants;
-import com.verizon.onemsg.omppservice.util.DateUtil;
+@ExtendWith(MockitoExtension.class)
+class OMPPSericeControllerTest {
 
-@RestController
-public class OMPPSericeController {
-	
-	private static final Logger log = LoggerFactory.getLogger(OMPPSericeController.class);
-	
-	@Value("${RMQ_EXCHANGE}")
-	String exchange;
-	
-	@Value("${RMQ_OMPPS_ROUTING_KEY}")
-	String routingKey;
-	
-	@Value("${RMQ_BATCH_DISCONNECT_PROCESS_QUEUE}")
-	String queueName;
-	@Autowired
-	RabbitTemplate rabbitTemplate;
-	
-	@Autowired
-	JmsTemplate jmsTemplate;
-	
-	@Autowired
-	CacheManager cacheManager;
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
-	@RequestMapping("/jsp/keepalive.jsp")
-	public String status() {
-		return "Success";
-	}
-	
-	@PostMapping("/OMPPSQueuePosterString")
-	public @ResponseBody String postToSepQueueString(@RequestBody(required=false) String message, @RequestParam(name="xmlreqdoc", required=false) String xmlreqdoc,  @RequestParam(name="routekey", required=false) String routeKey){
-		log.info("Inside OMPPS Queue poster");
-		log.info("## RMQ_EXCHANGE:"+exchange+" - Posting to ROUTING_KEY:"+routeKey );
-		if(null != xmlreqdoc && !xmlreqdoc.isEmpty() && StringUtils.isNotBlank(routeKey)) {
-			message = xmlreqdoc;
-			rabbitTemplate.convertAndSend(exchange, routeKey, message);
-		}else {
-			return "Failure !!! XML and routingkey is mandatory";
-		}
-		return "Success";
-	}
-	@PostMapping("/LegacyQueuePoster")
-	public @ResponseBody String postToLegacyQueue(@RequestBody(required=false) String message, @RequestParam(name="xmlreqdoc", required=false) String xmlreqdoc,  @RequestParam(name="queue", required=false) String queue){
-		log.info("Inside OMPPS Queue poster");
-		log.info("## Posting to IBMQ_:"+exchange+" - Posting to QueueName:"+queue );
-		MQQueue queueDest = null;
-		try {
-			queueDest = new MQQueue(queue);
-			queueDest.setPutAsyncAllowed(WMQConstants.WMQ_PUT_ASYNC_ALLOWED_ENABLED);
-			queueDest.setPersistence(DeliveryMode.NON_PERSISTENT);
-		}catch(Exception ex){
-			log.error("Unable to create queue destination: ", ex);
-			queueName = null;
-		}
-		if(null != xmlreqdoc && !xmlreqdoc.isEmpty() && StringUtils.isNotBlank(queue)) {
-			message = xmlreqdoc;
-			jmsTemplate.convertAndSend(queueDest, message);
-		}else {
-			return "Failure !!! XML and Queuename is mandatory";
-		}
-		return "Success";
-	}
-	
-	@RequestMapping(value="/PostingToQueue", method = RequestMethod.GET)
-    public ModelAndView postingToQueue(ModelMap model){
-		ModelAndView view = new ModelAndView("TestVisionActivity");
-        return view;
+    @Mock
+    private JmsTemplate jmsTemplate;
+
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache cache;
+
+    @InjectMocks
+    private OMPPSericeController omppSericeController;
+
+    @Test
+    void testStatus() {
+        // Act
+        String result = omppSericeController.status();
+
+        // Assert
+        assertEquals("Success", result);
     }
-	@RequestMapping("/PostingToQueue.jsp")
-	public ModelAndView PostingToQueue() {
-		ModelAndView view = new ModelAndView("TestVisionActivity");
-		return view;
-	}
-	@RequestMapping("/PostingToLegacyQueue.jsp")
-	public ModelAndView PostingToLegacyQueue() {
-		ModelAndView view = new ModelAndView("LegacyQActivity");
-		return view;
-	}
-	
-	@GetMapping("/clearCache") // To clear cache by name from database Caching
-    public @ResponseBody String clearCacheByname(@RequestParam(name="cacheName", required=false) String cacheName) {
-		if(DateUtil.isNotNullOrEmpty(cacheName)) {
-			cacheManager.getCache(cacheName).clear();
-		}
-		return "Success";
+
+    @Test
+    void testPostToSepQueueString_Success() {
+        // Arrange
+        String xmlreqdoc = "<xml>test</xml>";
+        String routeKey = "testRoute";
+
+        // Act
+        String actualResponse = omppSericeController.postToSepQueueString(xmlreqdoc, xmlreqdoc, routeKey);
+
+        // Assert
+        assertEquals("Success", actualResponse);
+        verify(rabbitTemplate, times(1)).convertAndSend(any(), any(), any());
+    }
+
+    @Test
+    void testPostToSepQueueString_Failure() {
+        // Act
+        String actualResponse = omppSericeController.postToSepQueueString(null, null, null);
+
+        // Assert
+        assertEquals("Failure !!! XML and routingkey is mandatory", actualResponse);
+        verify(rabbitTemplate, never()).convertAndSend(any(), any(), any());
+    }
+
+    @Test
+    void testPostToLegacyQueue_Success() {
+        // Arrange
+        String xmlreqdoc = "<xml>test</xml>";
+        String queueName = "testQueue";
+
+        // Act
+        String actualResponse = omppSericeController.postToLegacyQueue(xmlreqdoc, xmlreqdoc, queueName);
+
+        // Assert
+        assertEquals("Success", actualResponse);
+        verify(jmsTemplate, times(1)).convertAndSend(any(), any());
+    }
+
+    @Test
+    void testPostToLegacyQueue_Failure() {
+        // Act
+        String actualResponse = omppSericeController.postToLegacyQueue(null, null, null);
+
+        // Assert
+        assertEquals("Failure !!! XML and Queuename is mandatory", actualResponse);
+        verify(jmsTemplate, never()).convertAndSend(any(), any());
+    }
+
+    @Test
+    void testPostingToQueue() {
+        // Act
+        ModelAndView result = omppSericeController.postingToQueue(new ModelMap());
+
+        // Assert
+        assertEquals("TestVisionActivity", result.getViewName());
+    }
+
+    @Test
+    void testPostingToQueueJsp() {
+        // Act
+        ModelAndView result = omppSericeController.PostingToQueue();
+
+        // Assert
+        assertEquals("TestVisionActivity", result.getViewName());
+    }
+
+    @Test
+    void testPostingToLegacyQueueJsp() {
+        // Act
+        ModelAndView result = omppSericeController.PostingToLegacyQueue();
+
+        // Assert
+        assertEquals("LegacyQActivity", result.getViewName());
+    }
+
+    @Test
+    void testClearCacheByname_Success() {
+        // Arrange
+        String cacheName = "testCache";
+
+        when(cacheManager.getCache(cacheName)).thenReturn(cache);
+
+        // Act
+        String actualResponse = omppSericeController.clearCacheByname(cacheName);
+
+        // Assert
+        assertEquals("Success", actualResponse);
+        verify(cache, times(1)).clear();
+    }
+
+    @Test
+    void testClearCacheByname_CacheNotFound() {
+        // Arrange
+        String cacheName = "nonexistentCache";
+
+        when(cacheManager.getCache(cacheName)).thenReturn(null);
+
+        // Act
+        String actualResponse = omppSericeController.clearCacheByname(cacheName);
+
+        // Assert
+        assertEquals("Success", actualResponse); // It should still return "Success" as there is no cache to clear
+        verify(cache, never()).clear();
     }
 }
