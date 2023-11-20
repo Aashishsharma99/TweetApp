@@ -1,170 +1,129 @@
-package com.verizon.onemsg.omppservice.dao;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.ObjectOutputStream;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Base64;
-import java.util.Date;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
-import org.springframework.util.SerializationUtils;
 
-import com.verizon.onemsg.omppservice.constants.AppConstants;
 import com.verizon.onemsg.omppservice.properties.AppProperties;
-import com.vzw.cc.util.UniqueIdGenerator;
 import com.vzw.cc.valueobjects.AuditInfo;
 
-@Component
-public class CommonAuditDao {
-	
-	private static Logger log = LogManager.getLogger(CommonAuditDao.class.getName());
-	
-	@Value("${APP_ID}")
-	String appId;
-	
-	@Value("${PC_ADMIN_AUDIT_DATE_FORMAT}")
-	String pcAdminDateFormat;
-	
-	@Value("${RMQ_AUDIT_EXCHANGE}")
-	String auditExchange;
-	
-	@Value("${RMQ_OMPPS_PCADMIN_ROUTING_KEY}")
-	String pcRoutingKey;
-	
-	/*@Value("${RMQ_PCADMIN_AUDIT_QUEUE}")
-	String pcadminQueueName;*/
-	
-	//@Autowired
-	RabbitTemplate pcauditRabbitTemplate;
-	
-	@Autowired
-	AppProperties props ;
-	
-	@Autowired
-	OmppsDataManager dataManager;
-	
-	/*private CommonAuditDao() 
-		
-	}*/
-	
-	public CommonAuditDao(@Lazy RabbitTemplate pcauditRabbitTemplate){
-		this.pcauditRabbitTemplate = pcauditRabbitTemplate;
-	}
-	
+class CommonAuditDaoTest {
 
-	public AuditInfo createAuditMap(String reqXML, String clientId, String service){
-		AuditInfo auditInfo = new AuditInfo(Long.valueOf(UniqueIdGenerator.getUniqId()));
-		auditInfo.setReqInput(reqXML);
-		auditInfo.setGeneralInfo(appId, service,  getAuditDate());
-		auditInfo.setClient_id(clientId);
-		auditInfo.setServer(System.getProperty(AppConstants.SERVERID));
-		return auditInfo;
-	}
+    @Mock
+    private RabbitTemplate pcauditRabbitTemplate;
 
-	public void updateAuditMap(AuditInfo auditInfo , String mdn, String custId, String accNo, String sfoId){
-		
-		auditInfo.setCust_id(custId);
-		auditInfo.setNotification_address(mdn);
-		auditInfo.setAcct_no(accNo);
-		auditInfo.setTrns_type(sfoId);			
-	}
-	public void updateAuditMap(AuditInfo auditInfo, String status){	
-			
-		auditInfo.setStatus(status);
-		auditInfo.setResponse_TS(getAuditDate());
-		
-		try {
-			SimpleDateFormat sdf = new SimpleDateFormat(
-					props.getProperty((AppConstants.PC_ADMIN_AUDIT_DATE_FORMAT),"MMM-dd-yyyy HH:mm:ss"));
-			auditInfo.setResponse_time(System.currentTimeMillis() - sdf.parse(auditInfo.getResponse_TS()).getTime());
-		} catch (ParseException e) {
-			log.warn("unable to parse response time for audit", e);
-		}
-		
-	}
-	
-	public void submitAduitMessage(AuditInfo auditInfo){
-		try {
-			log.info("Sending to PC admin custid ::"+auditInfo.getCust_id() +"AccountNo :: "+ auditInfo.getAcct_no());
-			log.info("Message send to ****** "+auditExchange+"***Routing Key****"+pcRoutingKey);
-			byte [] auditData = SerializationUtils.serialize(auditInfo);
-			log.info("Size of the code ::"+auditData.length);
-			pcauditRabbitTemplate.convertAndSend(auditExchange, pcRoutingKey, auditData);
-			
-		} catch (Exception e) {
-			log.error("Sending Auditing Message", "CommonAuditing", "submitAduitMessage", e.getMessage(), "Error", e);
-		}
-	}
-	
-	public  void submitAduitMessage(AuditInfo auditInfo, String status){
-		try {
-			log.info("Sending audit request to Audit Q:" + props.getProperty(AppConstants.AUDIT_Q_NAME));
-			updateAuditMap(auditInfo, status);
-			submitAduitMessage(auditInfo);
-		} catch (Exception e) {
-			log.error("Sending Auditing Message", "CommonAuditing", "submitAduitMessage", e.getMessage(), "Error", e);
-		}		
-		
-	}
-	
-	
-	public static String encodeObj(Object obj)  throws Exception{
+    @Mock
+    private AppProperties appProperties;
 
-		ByteArrayOutputStream bo = new ByteArrayOutputStream();
-		ObjectOutputStream oo = new ObjectOutputStream(bo);
-		oo.writeObject(obj);
-		oo.flush();
-		String encodedMsg = Base64.getEncoder().encodeToString(bo.toByteArray()); 
-		return encodedMsg;
-	}
-	
-	public String getAuditDate() {
-		
-		SimpleDateFormat sdf = new SimpleDateFormat(
-				props.getProperty((AppConstants.PC_ADMIN_AUDIT_DATE_FORMAT),"MMM-dd-yyyy HH:mm:ss"));
-		return sdf.format(new Date());
-	}
+    @Mock
+    private OmppsDataManager dataManager;
 
-	
-	/*public static void updateActivationAudit(ClientActivity ca){
-		
-		log.info("inside CommonAuditing::updateActivationAudit : for MDN:"+ ca.getMdn());
-		Connection conn = null;
-		PreparedStatement st = null;
-		ResultSet rs = null;
-		try{			
-			conn = JdbcDao.getDMDBConnection();
-			st = conn.prepareStatement(DaoConstants.INSERT_OM_ACTIVATION_AUDIT);
-			st.setString(1, ca.getCustomerId()+"");
-			st.setString(2, ca.getAccountNumber()+"");
-			st.setString(3, ca.getMdn()+"");
-			st.setString(4, ca.getStatus());
-			st.setString(5, ca.getDeviceId());
-			st.setString(6, ca.getDeviceMake());
-			st.setString(7, ca.getDeviceModel());
-			st.setString(8, ca.getBillingSystem());
-			st.setString(9, ca.getTransactionId());
-			
-			
-			rs = st.executeQuery();	
-			
-		}catch (Exception e){
-			log.error("Inerting Into om_activation_audit", "CommonAuditing", "updateActivationAudit", e.getMessage(), "Error", e);
-		}finally{
-			try {
-				JdbcDao.closeConnection(conn, rs, st);
-			} catch (SQLException e) {
-				log.error("Connection Closing", "PromoCodeHelper", "updatePromoCode", e.getMessage(), "Error", e);
-			}
-		}
-	}*/
+    @InjectMocks
+    private CommonAuditDao commonAuditDao;
 
-	
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
+
+    @Test
+    void testCreateAuditMap() {
+        // Arrange
+        String reqXML = "<xml>test</xml>";
+        String clientId = "testClientId";
+        String service = "testService";
+
+        // Act
+        AuditInfo auditInfo = commonAuditDao.createAuditMap(reqXML, clientId, service);
+
+        // Assert
+        assertNotNull(auditInfo);
+        assertEquals(reqXML, auditInfo.getReqInput());
+        assertEquals(clientId, auditInfo.getClient_id());
+        assertEquals(appProperties.getProperty("APP_ID"), auditInfo.getApp_id());
+        assertEquals(service, auditInfo.getService());
+    }
+
+    @Test
+    void testUpdateAuditMap() {
+        // Arrange
+        AuditInfo auditInfo = new AuditInfo();
+        String mdn = "testMdn";
+        String custId = "testCustId";
+        String accNo = "testAccNo";
+        String sfoId = "testSfoId";
+
+        // Act
+        commonAuditDao.updateAuditMap(auditInfo, mdn, custId, accNo, sfoId);
+
+        // Assert
+        assertEquals(custId, auditInfo.getCust_id());
+        assertEquals(mdn, auditInfo.getNotification_address());
+        assertEquals(accNo, auditInfo.getAcct_no());
+        assertEquals(sfoId, auditInfo.getTrns_type());
+    }
+
+    @Test
+    void testUpdateAuditMapWithStatus() {
+        // Arrange
+        AuditInfo auditInfo = new AuditInfo();
+        String status = "testStatus";
+
+        // Act
+        commonAuditDao.updateAuditMap(auditInfo, status);
+
+        // Assert
+        assertEquals(status, auditInfo.getStatus());
+    }
+
+    @Test
+    void testSubmitAuditMessage() {
+        // Arrange
+        AuditInfo auditInfo = new AuditInfo();
+
+        // Act
+        commonAuditDao.submitAduitMessage(auditInfo);
+
+        // Assert
+        verify(pcauditRabbitTemplate, times(1)).convertAndSend(anyString(), anyString(), any(byte[].class));
+    }
+
+    @Test
+    void testSubmitAuditMessageWithStatus() {
+        // Arrange
+        AuditInfo auditInfo = new AuditInfo();
+        String status = "testStatus";
+
+        // Act
+        commonAuditDao.submitAduitMessage(auditInfo, status);
+
+        // Assert
+        verify(pcauditRabbitTemplate, times(1)).convertAndSend(anyString(), anyString(), any(byte[].class));
+    }
+
+    @Test
+    void testEncodeObj() throws Exception {
+        // Arrange
+        Object obj = new Object();
+
+        // Act
+        String encodedMsg = commonAuditDao.encodeObj(obj);
+
+        // Assert
+        assertNotNull(encodedMsg);
+    }
+
+    @Test
+    void testGetAuditDate() {
+        // Act
+        String auditDate = commonAuditDao.getAuditDate();
+
+        // Assert
+        assertNotNull(auditDate);
+    }
 }
