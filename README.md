@@ -1,102 +1,125 @@
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+package com.verizon.onemsg.omppservice.config;
 
-import java.util.Date;
+import javax.jms.DeliveryMode;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.messaginghub.pooled.jms.JmsPoolConnectionFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jms.connection.JmsTransactionManager;
+import org.springframework.jms.connection.UserCredentialsConnectionFactoryAdapter;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 
-class CommonAuditDaoTest {
+import com.ibm.mq.jms.MQQueueConnectionFactory;
+import com.ibm.msg.client.wmq.WMQConstants;
 
-    @Mock
-    private RabbitTemplate rabbitTemplate;
+@RefreshScope
+@Configuration
+@EnableAutoConfiguration(exclude=JmsAutoConfiguration.class)
+public class IBMMQConfig {
 
-    private CommonAuditDao commonAuditDao;
+	@Value("${ompp.ibm.mq.host}")
+    private String host;
+    @Value("${ompp.ibm.mq.port}")
+    private Integer port;
+    @Value("${ompp.ibm.mq.queue-manager}")
+    private String queueManager;
+    @Value("${ompp.ibm.mq.channel}")
+    private String channel;
+    @Value("${ompp.ibm.mq.username}")
+    private String username;
+    @Value("${ompp.ibm.mq.password}")
+    private String password;
+    @Value("${ompp.ibm.mq.receive-timeout}")
+    private long receiveTimeout;
+    
+    @Value("${ompp.ibm.mq.pool.idleTimeout}")
+    private int idleTimeout;
+    @Value("${ompp.ibm.mq.pool.maxConnections}")
+    private int maxConnections;
+    @Value("${ompp.ibm.mq.pool.maxSessionsPerConnection}")
+    private int maxSessionsPerConnection;
+    
+    /*@Bean
+    public JmsListenerContainerFactory<?> myFactory(JmsPoolConnectionFactory pooledConnectionFactory
+                                                    ,DefaultJmsListenerContainerFactoryConfigurer configurer) {
+        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+        // This provides all boot's default to this factory, including the message converter
+       // configurer.configure(factory, mqQueueConnectionFactory);
+        // You could still override some of Boot's default if necessary.
+        factory.setConnectionFactory(pooledConnectionFactory);
+        factory.setAutoStartup(enableSepIBMMQ);
+        return factory;
+    }*/
 
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-        commonAuditDao = new CommonAuditDao(rabbitTemplate);
-        ReflectionTestUtils.setField(commonAuditDao, "appId", "testAppId");
-        ReflectionTestUtils.setField(commonAuditDao, "pcAdminDateFormat", "MMM-dd-yyyy HH:mm:ss");
-        ReflectionTestUtils.setField(commonAuditDao, "auditExchange", "testAuditExchange");
-        ReflectionTestUtils.setField(commonAuditDao, "pcRoutingKey", "testPcRoutingKey");
+    @Bean
+    public MQQueueConnectionFactory mqQueueConnectionFactory() {
+        MQQueueConnectionFactory mqQueueConnectionFactory = new MQQueueConnectionFactory();
+        try {
+        	mqQueueConnectionFactory.setConnectionNameList(host);
+            mqQueueConnectionFactory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+        	//mqQueueConnectionFactory.setTransportType(WMQConstants.WMQ_CM_BINDINGS);
+            mqQueueConnectionFactory.setCCSID(1208);
+            mqQueueConnectionFactory.setChannel(channel);
+            //mqQueueConnectionFactory.setPort(port);
+            mqQueueConnectionFactory.setQueueManager(queueManager);
+            mqQueueConnectionFactory.setIntProperty(WMQConstants.WMQ_PUT_ASYNC_ALLOWED, WMQConstants.WMQ_PUT_ASYNC_ALLOWED_ENABLED);
+            //mqQueueConnectionFactory.setBooleanProperty(WMQConstants.USER_AUTHENTICATION_MQCSP, false);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return mqQueueConnectionFactory;
     }
 
-    @Test
-    void createAuditMap_ShouldCreateAuditInfo() {
-        // Arrange
-        String reqXML = "<test>data</test>";
-        String clientId = "testClientId";
-        String service = "testService";
-
-        // Act
-        AuditInfo auditInfo = commonAuditDao.createAuditMap(reqXML, clientId, service);
-
-        // Assert
-        assertNotNull(auditInfo);
-        assertEquals(clientId, auditInfo.getClient_id());
-        assertEquals(reqXML, auditInfo.getReqInput());
-        assertEquals("testAppId", auditInfo.getApp_id());
-        assertEquals(service, auditInfo.getService());
-        assertNotNull(auditInfo.getServer());
-        assertNotNull(auditInfo.getAuditId());
-        assertNotNull(auditInfo.getAudit_TS());
+    @Bean
+    public UserCredentialsConnectionFactoryAdapter userCredentialsConnectionFactoryAdapter(MQQueueConnectionFactory mqQueueConnectionFactory) {
+        UserCredentialsConnectionFactoryAdapter userCredentialsConnectionFactoryAdapter = new UserCredentialsConnectionFactoryAdapter();
+        userCredentialsConnectionFactoryAdapter.setUsername(username);
+        userCredentialsConnectionFactoryAdapter.setPassword(password);
+        userCredentialsConnectionFactoryAdapter.setTargetConnectionFactory(mqQueueConnectionFactory);
+        return userCredentialsConnectionFactoryAdapter;
     }
 
-    @Test
-    void updateAuditMap_WithDetails_ShouldUpdateAuditInfo() {
-        // Arrange
-        AuditInfo auditInfo = new AuditInfo(123L);
-        String mdn = "testMdn";
-        String custId = "testCustId";
-        String accNo = "testAccNo";
-        String sfoId = "testSfoId";
-
-        // Act
-        commonAuditDao.updateAuditMap(auditInfo, mdn, custId, accNo, sfoId);
-
-        // Assert
-        assertEquals(custId, auditInfo.getCust_id());
-        assertEquals(mdn, auditInfo.getNotification_address());
-        assertEquals(accNo, auditInfo.getAcct_no());
-        assertEquals(sfoId, auditInfo.getTrns_type());
+    @Bean
+    @Primary
+    public JmsPoolConnectionFactory pooledConnectionFactory(UserCredentialsConnectionFactoryAdapter userCredentialsConnectionFactoryAdapter) {
+    	JmsPoolConnectionFactory pooledConnectionFactory = new JmsPoolConnectionFactory();
+    	pooledConnectionFactory.setConnectionFactory(userCredentialsConnectionFactoryAdapter);
+    	pooledConnectionFactory.setConnectionIdleTimeout(idleTimeout);
+    	pooledConnectionFactory.setMaxConnections(maxConnections);
+    	pooledConnectionFactory.setMaxSessionsPerConnection(maxSessionsPerConnection);
+    	
+        return pooledConnectionFactory;
     }
 
-    @Test
-    void updateAuditMap_WithStatus_ShouldUpdateAuditInfo() throws Exception {
-        // Arrange
-        AuditInfo auditInfo = new AuditInfo(123L);
-        String status = "testStatus";
-
-        // Act
-        commonAuditDao.updateAuditMap(auditInfo, status);
-
-        // Assert
-        assertEquals(status, auditInfo.getStatus());
-        assertNotNull(auditInfo.getResponse_TS());
-        assertNotNull(auditInfo.getResponse_time());
+    @Bean
+    public PlatformTransactionManager jmsTransactionManager(JmsPoolConnectionFactory pooledConnectionFactory) {
+        JmsTransactionManager jmsTransactionManager = new JmsTransactionManager();
+        jmsTransactionManager.setConnectionFactory(pooledConnectionFactory);
+        
+        return jmsTransactionManager;
     }
 
-    @Test
-    void submitAduitMessage_ShouldSendMessageToRabbitMQ() {
-        // Arrange
-        AuditInfo auditInfo = new AuditInfo(123L);
-
-        // Act
-        commonAuditDao.submitAduitMessage(auditInfo);
-
-        // Assert
-        verify(rabbitTemplate, times(1)).convertAndSend(
-                eq("testAuditExchange"),
-                eq("testPcRoutingKey"),
-                any(byte[].class));
+    @Bean
+    public JmsTemplate jmsTemplate(JmsPoolConnectionFactory pooledConnectionFactory) {
+        JmsTemplate jmsTemplate = new JmsTemplate(pooledConnectionFactory);
+        jmsTemplate.setReceiveTimeout(receiveTimeout);
+        
+        jmsTemplate.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
+		jmsTemplate.setDeliveryPersistent(false);
+		jmsTemplate.setSessionTransacted(false);
+		
+        return jmsTemplate;
     }
-
-    // Add more test cases as needed, including edge cases and exception scenarios.
+    
+    
 }
+
+	
+
