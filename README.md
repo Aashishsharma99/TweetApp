@@ -1,43 +1,48 @@
-import com.ibm.mq.jms.MQQueueConnectionFactory;
-import org.junit.jupiter.api.Test;
+package com.verizon.onemsg.omppservice.properties;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.jms.connection.JmsTransactionManager;
-import org.springframework.jms.core.JmsTemplate;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+@RefreshScope
+@Component
+public class AppProperties {
+	
+	@Autowired
+	Environment environment;
 
-@SpringBootTest
-class IBMMQConfigTest {
+	
 
-    @Autowired
-    private MQQueueConnectionFactory mqQueueConnectionFactory;
-
-    @Autowired
-    private JmsTransactionManager jmsTransactionManager;
-
-    @Autowired
-    private JmsTemplate jmsTemplate;
-
-    // Add more tests for other beans if needed
-
-    @Test
-    void testMqQueueConnectionFactory() {
-        assertNotNull(mqQueueConnectionFactory);
-        // Add assertions for specific properties if needed
-    }
-
-    @Test
-    void testJmsTransactionManager() {
-        assertNotNull(jmsTransactionManager);
-        // Add assertions for specific properties if needed
-    }
-
-    @Test
-    void testJmsTemplate() {
-        assertNotNull(jmsTemplate);
-        // Add assertions for specific properties if needed
-    }
+	/**
+	 * Return the property value associated with the given key, or null if the
+	 * key cannot be resolved.
+	 * 
+	 * @param propName
+	 * @return
+	 */
     
-    // Add more tests for other beans if needed
+	public String getProperty(String key) {
+
+		String propValue = environment.getProperty(key);
+		
+		return propValue != null ? propValue.trim() : propValue; 
+	}
+
+	
+	/**
+	 * Return the property value associated with the given key, or defaultValue
+	 * if the key cannot be resolved.
+	 * 
+	 * @param propName
+	 * @param defaultValue
+	 * @return
+	 */
+	public String getProperty(String key,String defaultValue) {
+
+		final String propValue =  environment.getProperty(key);
+		
+		return propValue != null ? propValue : defaultValue;
+		
+	}
 }
