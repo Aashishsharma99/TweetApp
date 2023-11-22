@@ -1,65 +1,15 @@
-package com.verizon.onemsg.omppservice.receiver;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-import javax.jms.TextMessage;
-
+import com.verizon.onemsg.omppservice.receiver.BatchMDNDisconnectReceiver;
+import com.verizon.onemsg.omppservice.service.MDNCleanupService;
+import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
-
-import com.verizon.onemsg.omppservice.service.MDNCleanupService;
-import com.vzw.cc.util.Encoder;
-
-@Service
-public class BatchMDNDisconnectReceiver {
-	private Logger log = LogManager.getLogger(BatchMDNDisconnectReceiver.class.getName());
-	
-	//@Autowired
-	MDNCleanupService mdnCleanupService;
-	
-	public BatchMDNDisconnectReceiver(@Lazy MDNCleanupService mdnCleanupService){
-		this.mdnCleanupService = mdnCleanupService;
-	}
-	
-	public void onMessage(byte[] message) {
-		long startTime = System.currentTimeMillis();
-		log.info(message.getClass());
-		String messageTxt = new String(message);
-		log.info("### OM request received as bytes:" + messageTxt);
-		}
-
-	public void onMessage(String messageTxt) {
-		long startTime = System.currentTimeMillis();
-		
-		String xmlMsg = null;
-		TextMessage txtMsg = null;
-		try {
-			xmlMsg = messageTxt;
-
-			log.debug("Request XML : " + xmlMsg);
-			if (xmlMsg != null) {
-				xmlMsg = Encoder.makeXmlValid(xmlMsg);
-				mdnCleanupService.doDisconnectMDNProcessing(xmlMsg);
-				log.debug("End BatchMDNDisconnectMDB");
-			}
-		}catch (Exception e) {
-		// TODO: handle exception
-		}
-
-		log.info("### OM request received as string:" + messageTxt);
-
-		}
-}
-
-package com.verizon.onemsg.omppservice.receiver;
-
-import static org.junit.jupiter.api.Assertions.assertNull;
-
-import com.verizon.onemsg.omppservice.service.MDNCleanupService;
-
-import java.io.UnsupportedEncodingException;
-
-import org.junit.jupiter.api.Disabled;
+import org.apache.logging.log4j.core.Appender;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.Logger;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,38 +19,82 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 @SpringBootTest
 @ExtendWith(SpringExtension.class)
 class BatchMDNDisconnectReceiverTest {
+
     @Autowired
     private BatchMDNDisconnectReceiver batchMDNDisconnectReceiver;
 
+    private TestSetup testSetup;
+
+    @BeforeEach
+    void setUp() {
+        testSetup = new TestSetup();
+    }
+
+    @Test
     void testOnMessage() {
-       
-        (new BatchMDNDisconnectReceiver(new MDNCleanupService())).onMessage("End BatchMDNDisconnectMDB");
+        // Arrange
+        String xmlMsg = "<xml>your_xml_here</xml>";
+
+        // Act
+        batchMDNDisconnectReceiver.onMessage(xmlMsg);
+
+        // Assert
+        testSetup.verifyDoDisconnectMDNProcessingCalledWith(xmlMsg);
+        testSetup.verifyLogMessage("End BatchMDNDisconnectMDB");
     }
 
     @Test
     void testOnMessage2() {
-        (new BatchMDNDisconnectReceiver(new MDNCleanupService())).onMessage((String) null);
+        // Act
+        batchMDNDisconnectReceiver.onMessage(null);
+
+        // Assert
+        testSetup.verifyDoDisconnectMDNProcessingNotCalled();
+        testSetup.verifyLogMessage("### OM request received as string:null");
     }
 
-    @Test
-    void testOnMessage3() {
-       
-        BatchMDNDisconnectReceiver batchMDNDisconnectReceiver = new BatchMDNDisconnectReceiver(null);
-        batchMDNDisconnectReceiver.onMessage("Message Txt");
-        assertNull(batchMDNDisconnectReceiver.mdnCleanupService);
-    }
+    // Add more tests...
 
-  
-    @Test
-    void testOnMessage4() {
-        (new BatchMDNDisconnectReceiver(new MDNCleanupService()))
-                .onMessage("com.verizon.onemsg.omppservice.receiver.BatchMDNDisconnectReceiver");
-    }
+    private static class TestSetup {
 
-    @Test
-    void testOnMessage5() throws UnsupportedEncodingException {
-       
-        this.batchMDNDisconnectReceiver.onMessage("AAAAAAAA".getBytes("UTF-8"));
+        private MDNCleanupService mdnCleanupServiceMock;
+        private Appender appender;
+
+        TestSetup() {
+            mdnCleanupServiceMock = mock(MDNCleanupService.class);
+            batchMDNDisconnectReceiver = new BatchMDNDisconnectReceiver(mdnCleanupServiceMock);
+
+            // Capture log messages for verification
+            Logger logger = (Logger) LogManager.getLogger(BatchMDNDisconnectReceiver.class);
+            appender = mockAppender(logger);
+            logger.addAppender(appender);
+        }
+
+        void verifyDoDisconnectMDNProcessingCalledWith(String xmlMsg) {
+            verify(mdnCleanupServiceMock, times(1)).doDisconnectMDNProcessing(xmlMsg);
+        }
+
+        void verifyDoDisconnectMDNProcessingNotCalled() {
+            verifyZeroInteractions(mdnCleanupServiceMock);
+        }
+
+        void verifyLogMessage(String expectedLogMessage) {
+            ArgumentCaptor<LogEvent> logCaptor = ArgumentCaptor.forClass(LogEvent.class);
+            verify(appender, atLeastOnce()).append(logCaptor.capture());
+            assertTrue(logCaptor.getAllValues().stream().anyMatch(logEvent ->
+                    logEvent.getMessage().getFormattedMessage().contains(expectedLogMessage)));
+        }
+
+        private Appender mockAppender(Logger logger) {
+            Appender mockAppender = mock(AbstractAppender.class);
+            when(mockAppender.getName()).thenReturn("MockAppender");
+            doAnswer(invocation -> {
+                LogEvent event = invocation.getArgument(0);
+                logger.log(event);
+                return null;
+            }).when(mockAppender).append(any());
+
+            return mockAppender;
+        }
     }
 }
-
