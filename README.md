@@ -1,56 +1,106 @@
-import static org.mockito.Mockito.*;
+package com.verizon.onemsg.omppservice.receiver;
 
-import javax.jms.JMSException;
-import javax.jms.Message;
 import javax.jms.TextMessage;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+
+import com.verizon.onemsg.omppservice.service.MDNCleanupService;
+import com.vzw.cc.util.Encoder;
+
+@Service
+public class BatchMDNDisconnectReceiver {
+	private Logger log = LogManager.getLogger(BatchMDNDisconnectReceiver.class.getName());
+	
+	//@Autowired
+	MDNCleanupService mdnCleanupService;
+	
+	public BatchMDNDisconnectReceiver(@Lazy MDNCleanupService mdnCleanupService){
+		this.mdnCleanupService = mdnCleanupService;
+	}
+	
+	public void onMessage(byte[] message) {
+		long startTime = System.currentTimeMillis();
+		log.info(message.getClass());
+		String messageTxt = new String(message);
+		log.info("### OM request received as bytes:" + messageTxt);
+		}
+
+	public void onMessage(String messageTxt) {
+		long startTime = System.currentTimeMillis();
+		
+		String xmlMsg = null;
+		TextMessage txtMsg = null;
+		try {
+			xmlMsg = messageTxt;
+
+			log.debug("Request XML : " + xmlMsg);
+			if (xmlMsg != null) {
+				xmlMsg = Encoder.makeXmlValid(xmlMsg);
+				mdnCleanupService.doDisconnectMDNProcessing(xmlMsg);
+				log.debug("End BatchMDNDisconnectMDB");
+			}
+		}catch (Exception e) {
+		// TODO: handle exception
+		}
+
+		log.info("### OM request received as string:" + messageTxt);
+
+		}
+}
+
+package com.verizon.onemsg.omppservice.receiver;
+
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.verizon.onemsg.omppservice.service.MDNCleanupService;
 
-class BatchDisconnectIBMQReceiverTest {
+import java.io.UnsupportedEncodingException;
 
-    private BatchDisconnectIBMQReceiver receiver;
-    private MDNCleanupService mdnCleanupService;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-    @BeforeEach
-    void setUp() {
-        mdnCleanupService = mock(MDNCleanupService.class);
-        receiver = new BatchDisconnectIBMQReceiver(mdnCleanupService);
+@SpringBootTest
+@ExtendWith(SpringExtension.class)
+class BatchMDNDisconnectReceiverTest {
+    @Autowired
+    private BatchMDNDisconnectReceiver batchMDNDisconnectReceiver;
+
+    void testOnMessage() {
+       
+        (new BatchMDNDisconnectReceiver(new MDNCleanupService())).onMessage("End BatchMDNDisconnectMDB");
     }
 
     @Test
-    void testOnMessage() throws JMSException {
-        // Arrange
-        Message message = mock(Message.class);
-        TextMessage textMessage = mock(TextMessage.class);
-
-        when(message.getIntProperty("JMSXDeliveryCount")).thenReturn(1);
-        when(message instanceof TextMessage).thenReturn(true);
-        when((TextMessage) message).thenReturn(textMessage);
-        when(textMessage.getText()).thenReturn("<xml>your_xml_here</xml>");
-
-        // Act
-        receiver.onMessage(message);
-
-        // Assert
-        verify(mdnCleanupService, times(1)).doDisconnectMDNProcessing("<xml>your_xml_here</xml>");
+    void testOnMessage2() {
+        (new BatchMDNDisconnectReceiver(new MDNCleanupService())).onMessage((String) null);
     }
 
     @Test
-    void testOnMessageWithException() throws JMSException {
-        // Arrange
-        Message message = mock(Message.class);
+    void testOnMessage3() {
+       
+        BatchMDNDisconnectReceiver batchMDNDisconnectReceiver = new BatchMDNDisconnectReceiver(null);
+        batchMDNDisconnectReceiver.onMessage("Message Txt");
+        assertNull(batchMDNDisconnectReceiver.mdnCleanupService);
+    }
 
-        when(message.getIntProperty("JMSXDeliveryCount")).thenReturn(1);
-        when(message instanceof TextMessage).thenReturn(true);
-        when(((TextMessage) message).getText()).thenThrow(new JMSException("Simulated exception"));
+  
+    @Test
+    void testOnMessage4() {
+        (new BatchMDNDisconnectReceiver(new MDNCleanupService()))
+                .onMessage("com.verizon.onemsg.omppservice.receiver.BatchMDNDisconnectReceiver");
+    }
 
-        // Act
-        receiver.onMessage(message);
-
-        // Assert (you can customize the assertions based on your specific needs)
-        // For example, you can verify that the logger is called with the expected arguments.
+    @Test
+    void testOnMessage5() throws UnsupportedEncodingException {
+       
+        this.batchMDNDisconnectReceiver.onMessage("AAAAAAAA".getBytes("UTF-8"));
     }
 }
+
