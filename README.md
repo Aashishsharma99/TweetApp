@@ -1,100 +1,63 @@
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
-import com.verizon.onemsg.omppservice.receiver.BatchMDNDisconnectReceiver;
-import com.verizon.onemsg.omppservice.service.MDNCleanupService;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Appender;
-import org.apache.logging.log4j.core.LogEvent;
-import org.apache.logging.log4j.core.Logger;
-import org.apache.logging.log4j.core.appender.AbstractAppender;
-import org.junit.jupiter.api.BeforeEach;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.TextMessage;
+
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-@SpringBootTest
-@ExtendWith(SpringExtension.class)
-class BatchMDNDisconnectReceiverTest {
+import com.verizon.onemsg.omppservice.service.MDNCleanupService;
 
-    @Autowired
-    private BatchMDNDisconnectReceiver batchMDNDisconnectReceiver;
+@ExtendWith(MockitoExtension.class)
+class BatchDisconnectIBMQReceiverTest {
 
-    private TestSetup testSetup;
+    @InjectMocks
+    private BatchDisconnectIBMQReceiver receiver;
 
-    @BeforeEach
-    void setUp() {
-        testSetup = new TestSetup();
-    }
+    @Mock
+    private MDNCleanupService mdnCleanupService;
+
+    @Mock
+    private Message message;
 
     @Test
-    void testOnMessage() {
+    void testOnMessage() throws JMSException {
         // Arrange
+        when(message.getIntProperty("JMSXDeliveryCount")).thenReturn(1);
+        when(message instanceof TextMessage).thenReturn(true);
+
+        TextMessage textMessage = mock(TextMessage.class);
+        when((TextMessage) message).thenReturn(textMessage);
+
         String xmlMsg = "<xml>your_xml_here</xml>";
+        when(textMessage.getText()).thenReturn(xmlMsg);
 
         // Act
-        batchMDNDisconnectReceiver.onMessage(xmlMsg);
+        receiver.onMessage(message);
 
         // Assert
-        testSetup.verifyDoDisconnectMDNProcessingCalledWith(xmlMsg);
-        testSetup.verifyLogMessage("End BatchMDNDisconnectMDB");
+        verify(mdnCleanupService, times(1)).doDisconnectMDNProcessing(xmlMsg);
     }
 
     @Test
-    void testOnMessage2() {
+    void testOnMessageWithNullXml() throws JMSException {
+        // Arrange
+        when(message.getIntProperty("JMSXDeliveryCount")).thenReturn(1);
+        when(message instanceof TextMessage).thenReturn(true);
+
+        TextMessage textMessage = mock(TextMessage.class);
+        when((TextMessage) message).thenReturn(textMessage);
+
+        when(textMessage.getText()).thenReturn(null);
+
         // Act
-        batchMDNDisconnectReceiver.onMessage(null);
+        receiver.onMessage(message);
 
         // Assert
-        testSetup.verifyDoDisconnectMDNProcessingNotCalled();
-        testSetup.verifyLogMessage("### OM request received as string:null");
-    }
-
-    // Add more tests...
-
-    private static class TestSetup {
-
-        private MDNCleanupService mdnCleanupServiceMock;
-        private Appender appender;
-
-        TestSetup() {
-            mdnCleanupServiceMock = mock(MDNCleanupService.class);
-            batchMDNDisconnectReceiver = new BatchMDNDisconnectReceiver(mdnCleanupServiceMock);
-
-            // Capture log messages for verification
-            Logger logger = (Logger) LogManager.getLogger(BatchMDNDisconnectReceiver.class);
-            appender = mockAppender(logger);
-            logger.addAppender(appender);
-        }
-
-        void verifyDoDisconnectMDNProcessingCalledWith(String xmlMsg) {
-            verify(mdnCleanupServiceMock, times(1)).doDisconnectMDNProcessing(xmlMsg);
-        }
-
-        void verifyDoDisconnectMDNProcessingNotCalled() {
-            verifyZeroInteractions(mdnCleanupServiceMock);
-        }
-
-        void verifyLogMessage(String expectedLogMessage) {
-            ArgumentCaptor<LogEvent> logCaptor = ArgumentCaptor.forClass(LogEvent.class);
-            verify(appender, atLeastOnce()).append(logCaptor.capture());
-            assertTrue(logCaptor.getAllValues().stream().anyMatch(logEvent ->
-                    logEvent.getMessage().getFormattedMessage().contains(expectedLogMessage)));
-        }
-
-        private Appender mockAppender(Logger logger) {
-            Appender mockAppender = mock(AbstractAppender.class);
-            when(mockAppender.getName()).thenReturn("MockAppender");
-            doAnswer(invocation -> {
-                LogEvent event = invocation.getArgument(0);
-                logger.log(event);
-                return null;
-            }).when(mockAppender).append(any());
-
-            return mockAppender;
-        }
+        verify(mdnCleanupService, never()).doDisconnectMDNProcessing(any());
     }
 }
