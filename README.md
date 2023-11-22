@@ -72,7 +72,12 @@ public class ActivateProcessor {
 	public ActivateProcessor(){
 		
 	}
-	
+	/*public static synchronized ActivateProcessor getInstnace(){
+		if(instance == null)
+			instance = new ActivateProcessor();
+		
+		return instance;	
+	}*/
 	
 	public static void main(String[] args) {
 		try{
@@ -126,7 +131,11 @@ public class ActivateProcessor {
 				}
 				
 								
+			//Get XSL mapping
+			///XSLConfig xslConfig = XSLConfig.getInstance();
+			//HashMap<String, XSLBean> xslMap = xslConfig.getXSLMap();
 			
+			/*List<XSLTransformerEntity> xslList = dataManager.findall(); // Caching enabled on datamanager
 			HashMap<String, XSLBean> xslMap = commonUtil.createMap(xslList);
 			XSLBean xslBean = xslMap.get(props.getProperty("VISION_ACTIVATE_XSL"));
 										            	
