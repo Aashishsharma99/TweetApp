@@ -72,12 +72,7 @@ public class ActivateProcessor {
 	public ActivateProcessor(){
 		
 	}
-	/*public static synchronized ActivateProcessor getInstnace(){
-		if(instance == null)
-			instance = new ActivateProcessor();
-		
-		return instance;	
-	}*/
+	
 	
 	public static void main(String[] args) {
 		try{
@@ -131,48 +126,7 @@ public class ActivateProcessor {
 				}
 				
 								
-			//Get XSL mapping
-			///XSLConfig xslConfig = XSLConfig.getInstance();
-			//HashMap<String, XSLBean> xslMap = xslConfig.getXSLMap();
 			
-			/*List<XSLTransformerEntity> xslList = dataManager.findall(); // Caching enabled on datamanager
-			HashMap<String, XSLBean> xslMap = commonUtil.createMap(xslList);
-			XSLBean xslBean = xslMap.get(props.getProperty("VISION_ACTIVATE_XSL"));
-										            	
-        	//Convert Vision XML to SEP V2 XML using SEPV2-XSL
-            	aXSLTransformer.setXSL(xslBean.getXslStr());
-        		String resp = aXSLTransformer.transform(sourceXML);
-	        		
-        		//Replace @BP_ID@ with actual BP_ID mapped to this SFO
-        		resp = updateBPId(resp, props.getProperty("VISION_ACTIVATE_BP_ID"));
-        		log.debug("Final SEP Request :: "+resp);
-        		
-        		
-				 String mdn = Long.toString(clientActivity.getMdn());
-        		//Activation Audit
-        		 if(mdn!=null && mdn.trim().length()>0 && clientActivity.getDeviceModel()!= null && clientActivity.getDeviceModel().trim().length()>0){
-        			//Call SEP
-             		//Send SEP V2 XML        	       			
-             		String responseXML = sepCommunication.sendRequestToSEP(resp);             		
-             		auditInfo.setSynchResponse(responseXML);
-    				if(responseXML != null && responseXML.contains("Success")){
-    					status = "P";			
-    				} 
-             		if(responseXML != null && responseXML.trim().length()>0){
-        				 log.info("Response is not null");
-        				com.vzw.ecs.dm.message.ResponseDocument  respDoc = com.vzw.ecs.dm.message.ResponseDocument.Factory.parse(responseXML) ;
-        				Response response =  respDoc.getResponse(); 
-        				clientActivity.setTransactionId(response.getResponseID());
-        				clientActivity.setStatus("Success");
-        				
-        			 }else{
-        				 log.info("Response is null Status : Failed");
-        				 clientActivity.setStatus("Failed");        				 
-        			 } 
-        		 }else{
-        			 log.info("MDN && Device Model Validation failed. For MDN::"+clientActivity.getMdn()+", uid ::"+clientActivity.getTransactionId());
-        			 clientActivity.setStatus("Suppress");        			 
-        		 }*/
 				 	//status = "P";
 				 	clientActivity.setStatus(status);
 				 	dataManager.updateActivationAudit(clientActivity);
