@@ -1,80 +1,83 @@
-import com.verizon.onemsg.omppservice.beans.AuditInfo;
-import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
-import com.verizon.onemsg.omppservice.util.CommonUtils;
-import com.verizon.onemsg.omppservice.util.HttpCall;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+package com.verizon.onemsg.omppservice.handler;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
 
-@ExtendWith({MockitoExtension.class, SpringExtension.class})
-class CommonUtilsTest {
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
 
-    @Mock
-    private HttpCall httpCall;
+import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.verizon.onemsg.omppservice.receiver.MDNChangeReceiver;
+import com.verizon.onemsg.omppservice.service.CommonProcessor;
+import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
 
-    @Value("${BOS_AUTH_USERNAME}")
-    private String bosUserName;
+@Service
+public class FamilyBaseSFOHandler {
+	private Logger log = LogManager.getLogger(FamilyBaseSFOHandler.class.getName());
+	
+	@Autowired
+	AppProperties appProps;
+	
+	@Autowired
+	CommonProcessor processor;
+	
+	public String process(Document document, String status) {
 
-    @Value("${BOS_AUTH_PASSWORD}")
-    private String bosPassword;
+		try {
 
-    @Value("${BOS_PC_SERVICES_HTTP_TIMEOUT}")
-    private String bosBosPcHttpTimeout;
+			XPath xpath = XPathFactory.newInstance().newXPath();
+			XPathExpression expr = xpath.compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID");
+			NodeList nodes = (NodeList) expr.evaluate(document, XPathConstants.NODESET);
+			
+			log.info("Inside FamilyBaseSFOBean::process()");			
+		
+			NodeList childNodes;
+			
+			if (nodes != null && nodes.getLength() > 0) {
 
-    @Value("${BOS_PC_SERVICE_ACTIVATE_ENDPOINT}")
-    private String bosPcServiceActivateEndpoint;
+				for (int i = 0; i < nodes.getLength(); i++) {
+					if (nodes.item(i).hasChildNodes()) {
+						childNodes = nodes.item(i).getChildNodes();
+						for (int j = 0; childNodes != null && j < childNodes.getLength(); j++) {
+							if ("SFO_ID".equalsIgnoreCase(childNodes.item(j).getNodeName())
+									&& appProps.getProperty("FAMILY_BASE_SFO_ID")
+											.equalsIgnoreCase(childNodes.item(j).getTextContent())) {
+								log.info("Found matching SFO_ID for family base 2 feature");
+								for (int k = 0; childNodes != null && k < childNodes.getLength(); k++) {
+									if (appProps.getProperty("FAMILY_BASE_ADD_STR")
+											.equalsIgnoreCase(childNodes.item(k).getNodeName())) {
+										// trigger SMS if SFO_ID is 78460 and
+										// has effective date tag
+										log.info("Found effective date tag for SFO_ID triggering SMS");
+										String mtn = VisionAlertsProcessor.getNode(document,
+												XPathFactory.newInstance().newXPath(),
+												"//EDR_CPF//CHANGE_DATA_FEATURES//TR_KEY//TR_MDN//text()");
 
-    @Value("${BOS_PC_SERVICE_DEACTIVATE_ENDPOINT}")
-    private String bosPcServiceDeactivateEndPoint;
+										return processor.triggerSMS(Long.parseLong(mtn),
+												appProps.getProperty("FAMILY_BASE_SMS_REQ_TYPE"));
+										
+									}
+								}
+							}
+							log.info("Node:" + childNodes.item(j).getNodeName() + " Value:"
+									+ childNodes.item(j).getTextContent());
+						}
+					}
+				}
+				
+			
+			}			
+			
+		} catch (Exception e) {
+			log.error("FamilyBaseAlert", "FamilyBaseSFOBean", "process", e.getMessage(), "FATAL", e);
+		}
 
-    @Value("${APP_ID}")
-    private String appId;
-
-    @Value("${ENV}")
-    private static String environment;
-
-    @InjectMocks
-    private CommonUtils commonUtils;
-
-    @Test
-    void testMakeCallToBOSPreferenceCenter() {
-        // Arrange
-        String activityType = "ACTIVATE";
-        BOSAccountBean bean = new BOSAccountBean(); // Provide necessary data for BOSAccountBean
-        AuditInfo auditInfo = new AuditInfo(); // Provide necessary data for AuditInfo
-
-        // Mocking
-        when(httpCall.submitJSONToUrl(any(), any(), anyInt(), any())).thenReturn("200");
-
-        // Act
-        String result = commonUtils.makeCallToBOSPreferenceCenter(activityType, bean, auditInfo);
-
-        // Assert
-        assertEquals("P", result);
-        // Add more assertions or verifications based on your requirements
-    }
-
-    @Test
-    void testConnectToSunMsgServer() {
-        // Arrange
-        String mailhost = "your_mailhost_here"; // Provide a valid mailhost
-
-        // Mocking
-        when(httpCall.submitJSONToUrl(any(), any(), anyInt(), any())).thenReturn("200");
-
-        // Act
-        boolean result = commonUtils.connectToSunMsgServer(mailhost);
-
-        // Assert
-        // Add assertions based on your requirements
-    }
+		return "P";
+	}
 }
