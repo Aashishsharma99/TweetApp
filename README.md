@@ -1,628 +1,193 @@
-package com.vzw.cc.util;
+package com.verizon.onemsg.omppservice.util;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringWriter;
+import java.sql.Clob;
+import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+/*
+ * Created on Aug 1, 2007
+ *
+ * TODO To change the template for this generated file go to
+ * Window - Preferences - Java - Code Style - Code Templates
+ */
 
-class HttpCallDaoTest {
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
+import com.verizon.onemsg.omppservice.beans.XSLBean;
+import com.verizon.onemsg.omppservice.entity.XSLTransformerEntity;
+import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.vzw.cc.valueobjects.AuditInfo;
+
+/**
+ * @author beherp
+ *
+ */
+@Component
+public class CommonUtils {	
+	
+	@Value("${BOS_AUTH_USERNAME}")
+	private String bosUserName;
+	
+	@Value("${BOS_AUTH_PASSWORD}")
+	 String bosPassword;
+	
+	@Value("${BOS_PC_SERVICES_HTTP_TIMEOUT}")
+	String bosBosPcHttpTimeout;
+	
+	@Value("${BOS_PC_SERVICE_ACTIVATE_ENDPOINT}")
+	String bosPcServiceActivateEndpoint;
+	
+	@Value("${BOS_PC_SERVICE_DEACTIVATE_ENDPOINT}")
+	String bosPcServiceDeactivateEndPoint;
+	
+	@Value("${APP_ID}")
+	String appId;
+	
+	@Value("${ENV}")
+	private static String environment;
+	
+	@Autowired
+	AppProperties props;
+	
+	@Autowired
+	HttpCall httpCall;
+	
+	private Logger log = LogManager.getLogger(CommonUtils.class.getName());
+	
+	
+    public static String padWithZeros(String value, int size){
+		
+		if (value == null){
+			value = "";
+		}
+		
+		StringBuffer buffer = new StringBuffer(value);
+		
+		if(value != null && value.length() >= size){
+			return value;
+		}else{
+			for(int i = value.length(); i < size ; i++ ){
+				buffer.insert(0, '0');
+			}
+		}
+		
+		return buffer.toString();
+	}
+    
+    
     /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String)}
+     * Include JavaDocs please!
+     *
+     * @param doc DOCUMENT ME!
+     *
+     * @return DOCUMENT ME!
      */
-    @Test
-    void testCallHttpGet() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("MakingHttpCall", "https://example.org/example"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", XpathValueFinder.LBL_ZERO_ZERO_AMOUNT));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("text/xml", "https://example.org/example"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("MakingHttpCall", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("text/xml", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", new HttpClientParams()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("MakingHttpCall", "https://example.org/example", new HttpClientParams()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpGet(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                "https://example.org/example", new HttpClientParams()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpGet("https://example.org/example",
-                XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, new HttpClientParams()));
+    public  String makeCallToBOSPreferenceCenter(final String activityType , BOSAccountBean bean , AuditInfo auditInfo) {
+        String bosPcEndPoint = null;
+        final String USERNAME = bosUserName;
+        final String PASSWORD = bosPassword;
+        final int timeOut = Integer.parseInt(bosBosPcHttpTimeout);
+        String status = null;
+        String queryData = null;
+        ObjectMapper mapper = null;
+        try {
+            mapper = new ObjectMapper();         
+            queryData = mapper.writeValueAsString(bean);    
+            if ("ACTIVATE" .equals(activityType)) {            	
+            	bosPcEndPoint = bosPcServiceActivateEndpoint;
+            	
+            } else if("DEACTIVATE" .equals(activityType)){            	
+            	bosPcEndPoint = bosPcServiceDeactivateEndPoint;
+            }
+            
+            final String USER_PASS = USERNAME + ":" + PASSWORD;
+	    	String basicAuth = "Basic " + new String(new Base64().encode(USER_PASS.getBytes()));
+	    	log.info("Calling BOS Preference Center - queryData : " + queryData);            
+            String responseStr = httpCall.submitJSONToUrl(bosPcEndPoint, queryData, timeOut, basicAuth);
+            log.info("Calling BOS Preference Center - response : " + responseStr);            
+            auditInfo.setSynchResponse(responseStr);
+            if(responseStr != null && responseStr.equals("200")) {
+                status = "P";
+            } else {
+                status = "F";
+            }
+        } catch(Exception ex) {
+        	log.error(appId, "makeCallToBOSPreferenceCenter", CommonUtils.class.getName(), "makeCallToBOSPreferenceCenter", ex.getMessage(), "ERROR", ex);
+            status = "F";
+        } finally {
+        	log.info("makeCallToBOSPreferenceCenter END PROCESS->:status:" + status);
+        	auditInfo.setStatus(status);
+        }
+        return status;
     }
+    
+    
+	public boolean  connectToSunMsgServer(final String mailhost) {
 
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpGet2() {
+		boolean connect = false;
 
-        HttpCallDao.callHttpGet("Making http call", "https://example.org/example");
-    }
+		String env = environment;
+		
+		if ("prod".equalsIgnoreCase(env) && mailhost != null) {
 
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpGet3() {
+			if (mailhost.contains(props.getProperty("PROD_EAST_MAILHOST_PREFIX"))
+					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "ON"))) {
 
+				connect = true;
 
-        HttpCallDao.callHttpGet("Making http call", "https://example.org/example", 1);
-    }
+			} else if (mailhost.contains(props.getProperty("PROD_WEST_MAILHOST_PREFIX"))
+					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "ON"))) {
 
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpGet4() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.GetMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpGet(HttpCallDao.java:56)
-        //   In order to prevent callHttpGet(String, String, HttpClientParams)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpGet(String, String, HttpClientParams).
-        //   See https://diff.blue/R013 to resolve this issue.
+				connect = true;
+			}
+		}
 
-        HttpCallDao.callHttpGet("Making http call", "https://example.org/example", new HttpClientParams());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpGet5() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Params may not be null
-        //       at org.apache.commons.httpclient.HttpClient.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpGet(HttpCallDao.java:55)
-        //   In order to prevent callHttpGet(String, String, HttpClientParams)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpGet(String, String, HttpClientParams).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", (HttpClientParams) null);
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet6() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter((String) any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter((String) any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter((String) any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet7() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter((String) any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(null);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter((String) any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter((String) any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet8() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter((String) any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(HttpCallDao.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter((String) any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter((String) any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet9() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter((String) any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter((String) any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("text/xml", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter((String) any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, int)}
-     */
-    @Test
-    void testCallHttpPost() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("MakingHttpCall", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("text/xml", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", "https://example.org/example"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("https://example.org/example",
-                "callHttpPost: Aborted: xmlreqdoc= is required in data"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("MakingHttpCall", "callHttpPost: Aborted: xmlreqdoc= is required in data"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                "callHttpPost: Aborted: xmlreqdoc= is required in data"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("text/xml", "callHttpPost: Aborted: xmlreqdoc= is required in data"));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("https://example.org/example",
-                "callHttpPost: Aborted: xmlreqdoc= is required in data", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("MakingHttpCall", "callHttpPost: Aborted: xmlreqdoc= is required in data", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                "callHttpPost: Aborted: xmlreqdoc= is required in data", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("https://example.org/example",
-                "callHttpPost: Aborted: xmlreqdoc= is required in data", -1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("text/xml", "callHttpPost: Aborted: xmlreqdoc= is required in data", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", new HashMap<>()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("MakingHttpCall", new HashMap<>()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, new HashMap<>()));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao.callHttpPost("text/xml", new HashMap<>()));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpPost2() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:166)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:124)
-        //   In order to prevent callHttpPost(String, int)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpPost(String, int).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHttpPost("Making http call", 1);
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, String)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpPost3() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:166)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:118)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:86)
-        //   In order to prevent callHttpPost(String, String)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpPost(String, String).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHttpPost("Making http call", "callHttpPost: Aborted: xmlreqdoc= is required in data");
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, String, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpPost4() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:166)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:99)
-        //   In order to prevent callHttpPost(String, String, int)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpPost(String, String, int).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHttpPost("Making http call", "callHttpPost: Aborted: xmlreqdoc= is required in data", 1);
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHttpPost5() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:166)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:118)
-        //       at com.vzw.cc.util.HttpCallDao.callHttpPost(HttpCallDao.java:107)
-        //   In order to prevent callHttpPost(String, Map)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHttpPost(String, Map).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHttpPost("Making http call", new HashMap<>());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
-     */
-    @Test
-    void testCallHttpPost6() {
-        HashMap<String, String> stringStringMap = new HashMap<>();
-        stringStringMap.put("Making http call", "42");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
-     */
-    @Test
-    void testCallHttpPost7() {
-        HashMap<String, String> stringStringMap = new HashMap<>();
-        stringStringMap.put("Key", "42");
-        stringStringMap.put("Making http call", "42");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
-     */
-    @Test
-    void testCallHTTPBodyPost() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("https://example.org/example", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("MakingHttpCall", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("text/xml", "https://example.org/example", 1));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testCallHTTPBodyPost2() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Url String': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.callHTTPBodyPost(HttpCallDao.java:134)
-        //   In order to prevent callHTTPBodyPost(String, String, int)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   callHTTPBodyPost(String, String, int).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.callHTTPBodyPost("Url String", "https://example.org/example", 1);
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrl(String, String)}
-     */
-    @Test
-    void testSubmitXmlToUrl() {
-        assertNull(HttpCallDao.SubmitXmlToUrl("https://example.org/example", "https://example.org/example"));
-        assertNull(HttpCallDao.SubmitXmlToUrl("log4jUl", "https://example.org/example"));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOut(String, String, int)}
-     */
-    @Test
-    void testSubmitXmlToUrlWithTimeOut() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.SubmitXmlToUrlWithTimeOut("https://example.org/example", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.SubmitXmlToUrlWithTimeOut("text/xml", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.SubmitXmlToUrlWithTimeOut("UTF-8", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.SubmitXmlToUrlWithTimeOut(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOut(String, String, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testSubmitXmlToUrlWithTimeOut2() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http post call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.SubmitXmlToUrlWithTimeOut(HttpCallDao.java:289)
-        //   In order to prevent SubmitXmlToUrlWithTimeOut(String, String, int)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   SubmitXmlToUrlWithTimeOut(String, String, int).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.SubmitXmlToUrlWithTimeOut("Making http post call", "https://example.org/example", 1);
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int)}
-     */
-    @Test
-    void testSubmitXmlToUrlWithTimeOutAndRetry() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao
-                .SubmitXmlToUrlWithTimeOutAndRetry("https://example.org/example", "https://example.org/example", 1, 3));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao
-                .SubmitXmlToUrlWithTimeOutAndRetry("http.method.retry-handler", "https://example.org/example", 1, 3));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.SubmitXmlToUrlWithTimeOutAndRetry("text/xml", "https://example.org/example", 1, 3));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, HttpCallDao
-                .SubmitXmlToUrlWithTimeOutAndRetry(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1, 3));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int)}
-     */
-    @Test
-    @Disabled("TODO: Complete this test")
-    void testSubmitXmlToUrlWithTimeOutAndRetry2() {
-        // TODO: Complete this test.
-        //   Reason: R013 No inputs found that don't throw a trivial exception.
-        //   Diffblue Cover tried to run the arrange/act section, but the method under
-        //   test threw
-        //   java.lang.IllegalArgumentException: Invalid uri 'Making http post call': incorrect path
-        //       at org.apache.commons.httpclient.HttpMethodBase.<init>(null)
-        //       at org.apache.commons.httpclient.methods.ExpectContinueMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.EntityEnclosingMethod.<init>(null)
-        //       at org.apache.commons.httpclient.methods.PostMethod.<init>(null)
-        //       at com.vzw.cc.util.HttpCallDao.SubmitXmlToUrlWithTimeOutAndRetry(HttpCallDao.java:319)
-        //   In order to prevent SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int)
-        //   from throwing IllegalArgumentException, add constructors or factory
-        //   methods that make it easier to construct fully initialized objects used in
-        //   SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int).
-        //   See https://diff.blue/R013 to resolve this issue.
-
-        HttpCallDao.SubmitXmlToUrlWithTimeOutAndRetry("Making http post call", "https://example.org/example", 1, 3);
-    }
+		return connect;
+	}
+	
+	
+	
+	/*public HashMap<String,XSLBean> createMap(List<XSLTransformerEntity> listEntity){
+		HashMap<String, XSLBean> xslMap = new HashMap<String, XSLBean>();
+		
+		if(CollectionUtils.isNotEmpty(listEntity)) {
+			for(XSLTransformerEntity entity : listEntity) {
+				if(entity != null ) {
+					if(entity.getXSL() !=null) {
+						Clob xslClob = entity.getXSL();
+					    StringWriter xslString = new StringWriter();
+					    try {								   
+					    	Reader in = xslClob.getCharacterStream();
+							IOUtils.copy(in, xslString);
+							xslMap.put(entity.getKEY(), new XSLBean(entity.getKEY(), entity.getCLASS(), xslString.toString()));
+						} catch (IOException | SQLException e) {
+							// TODO Auto-generated catch block
+							log.info(" Exception accure while convertion "+e.getMessage());							
+						}
+					}
+					else 
+						xslMap.put(entity.getKEY(), new XSLBean(entity.getKEY(), entity.getCLASS(), null));
+				}
+				
+			}
+		}
+		return xslMap = MapUtils.isNotEmpty(xslMap)?xslMap:xslMap;	
+	}	
+*/
+		
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
-class HttpCallDaoTest {
-
-    // Existing tests...
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet6() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter(any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet7() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(null);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter(any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet8() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(HttpCallDao.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter(any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
-     */
-    @Test
-    void testCallHttpGet9() {
-        HttpClientParams httpClientParams = mock(HttpClientParams.class);
-        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
-        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
-        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
-        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
-        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpGet("text/xml", "https://example.org/example", httpClientParams));
-        verify(httpClientParams).getConnectionManagerClass();
-        verify(httpClientParams).getParameter(any());
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
-     */
-    @Test
-    void testCallHttpPost6() {
-        HashMap<String, String> stringStringMap = new HashMap<>();
-        stringStringMap.put("Making http call", "42");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
-     */
-    @Test
-    void testCallHttpPost7() {
-        HashMap<String, String> stringStringMap = new HashMap<>();
-        stringStringMap.put("Key", "42");
-        stringStringMap.put("Making http call", "42");
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
-     */
-    @Test
-    void testCallHTTPBodyPost() {
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("https://example.org/example", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("MakingHttpCall", "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1));
-        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
-                HttpCallDao.callHTTPBodyPost("text/xml", "https://example.org/example", 1));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
-     */
-    @Test
-    void testCallHTTPBodyPost2() {
-        assertThrows(IllegalArgumentException.class,
-                () -> HttpCallDao.callHTTPBodyPost("Url String", "https://example.org/example", 1));
-    }
-
-    /**
-     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int)}
-     */
-    @Test
-    void testSubmitXmlToUrlWithTimeOutAndRetry2() {
-        assertThrows(IllegalArgumentException.class, () -> HttpCallDao
-                .SubmitXmlToUrlWithTimeOutAndRetry("Making http post call", "https://example.org/example", 1, 3));
-    }
-}
-
