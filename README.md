@@ -1,83 +1,141 @@
-package com.verizon.onemsg.omppservice.handler;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
-import javax.xml.xpath.XPathFactory;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
+import org.junit.Before;
+import org.junit.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import com.verizon.onemsg.omppservice.properties.AppProperties;
-import com.verizon.onemsg.omppservice.receiver.MDNChangeReceiver;
 import com.verizon.onemsg.omppservice.service.CommonProcessor;
-import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
 
-@Service
-public class FamilyBaseSFOHandler {
-	private Logger log = LogManager.getLogger(FamilyBaseSFOHandler.class.getName());
-	
-	@Autowired
-	AppProperties appProps;
-	
-	@Autowired
-	CommonProcessor processor;
-	
-	public String process(Document document, String status) {
+public class FamilyBaseSFOHandlerTest {
 
-		try {
+    @Mock
+    private AppProperties appProperties;
 
-			XPath xpath = XPathFactory.newInstance().newXPath();
-			XPathExpression expr = xpath.compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID");
-			NodeList nodes = (NodeList) expr.evaluate(document, XPathConstants.NODESET);
-			
-			log.info("Inside FamilyBaseSFOBean::process()");			
-		
-			NodeList childNodes;
-			
-			if (nodes != null && nodes.getLength() > 0) {
+    @Mock
+    private CommonProcessor processor;
 
-				for (int i = 0; i < nodes.getLength(); i++) {
-					if (nodes.item(i).hasChildNodes()) {
-						childNodes = nodes.item(i).getChildNodes();
-						for (int j = 0; childNodes != null && j < childNodes.getLength(); j++) {
-							if ("SFO_ID".equalsIgnoreCase(childNodes.item(j).getNodeName())
-									&& appProps.getProperty("FAMILY_BASE_SFO_ID")
-											.equalsIgnoreCase(childNodes.item(j).getTextContent())) {
-								log.info("Found matching SFO_ID for family base 2 feature");
-								for (int k = 0; childNodes != null && k < childNodes.getLength(); k++) {
-									if (appProps.getProperty("FAMILY_BASE_ADD_STR")
-											.equalsIgnoreCase(childNodes.item(k).getNodeName())) {
-										// trigger SMS if SFO_ID is 78460 and
-										// has effective date tag
-										log.info("Found effective date tag for SFO_ID triggering SMS");
-										String mtn = VisionAlertsProcessor.getNode(document,
-												XPathFactory.newInstance().newXPath(),
-												"//EDR_CPF//CHANGE_DATA_FEATURES//TR_KEY//TR_MDN//text()");
+    @InjectMocks
+    private FamilyBaseSFOHandler handler;
 
-										return processor.triggerSMS(Long.parseLong(mtn),
-												appProps.getProperty("FAMILY_BASE_SMS_REQ_TYPE"));
-										
-									}
-								}
-							}
-							log.info("Node:" + childNodes.item(j).getNodeName() + " Value:"
-									+ childNodes.item(j).getTextContent());
-						}
-					}
-				}
-				
-			
-			}			
-			
-		} catch (Exception e) {
-			log.error("FamilyBaseAlert", "FamilyBaseSFOBean", "process", e.getMessage(), "FATAL", e);
-		}
+    @Before
+    public void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
 
-		return "P";
-	}
+    @Test
+    public void testProcessWithMatchingSFOIDAndEffectiveDate() throws Exception {
+        // Arrange
+        Document document = mock(Document.class);
+        NodeList sfoIdNodes = mock(NodeList.class);
+        Node sfoIdNode = mock(Node.class);
+        NodeList childNodes = mock(NodeList.class);
+
+        when(document.evaluate("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID", document, any())).thenReturn(sfoIdNodes);
+        when(sfoIdNodes.getLength()).thenReturn(1);
+        when(sfoIdNodes.item(0)).thenReturn(sfoIdNode);
+
+        when(sfoIdNode.hasChildNodes()).thenReturn(true);
+        when(sfoIdNode.getChildNodes()).thenReturn(childNodes);
+        when(childNodes.getLength()).thenReturn(1);
+        when(childNodes.item(0).getNodeName()).thenReturn("SFO_ID");
+        when(childNodes.item(0).getTextContent()).thenReturn("78460");
+
+        when(appProperties.getProperty("FAMILY_BASE_SFO_ID")).thenReturn("78460");
+        when(appProperties.getProperty("FAMILY_BASE_ADD_STR")).thenReturn("some_string");
+
+        when(processor.triggerSMS(any(Long.class), anyString())).thenReturn("SMS_TRIGGERED");
+
+        // Act
+        String result = handler.process(document, "some_status");
+
+        // Assert
+        assertEquals("SMS_TRIGGERED", result);
+    }
+
+    @Test
+    public void testProcessWithNonMatchingSFOID() throws Exception {
+        // Arrange
+        Document document = mock(Document.class);
+        NodeList sfoIdNodes = mock(NodeList.class);
+
+        when(document.evaluate("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID", document, any())).thenReturn(sfoIdNodes);
+        when(sfoIdNodes.getLength()).thenReturn(1);
+
+        when(appProperties.getProperty("FAMILY_BASE_SFO_ID")).thenReturn("non_matching_id");
+
+        // Act
+        String result = handler.process(document, "some_status");
+
+        // Assert
+        assertEquals("P", result);
+    }
+
+    @Test
+    public void testProcessWithNoSFOID() throws Exception {
+        // Arrange
+        Document document = mock(Document.class);
+        NodeList sfoIdNodes = mock(NodeList.class);
+
+        when(document.evaluate("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID", document, any())).thenReturn(sfoIdNodes);
+        when(sfoIdNodes.getLength()).thenReturn(0);
+
+        // Act
+        String result = handler.process(document, "some_status");
+
+        // Assert
+        assertEquals("P", result);
+    }
+
+    @Test
+    public void testProcessWithNoEffectiveDateTag() throws Exception {
+        // Arrange
+        Document document = mock(Document.class);
+        NodeList sfoIdNodes = mock(NodeList.class);
+        Node sfoIdNode = mock(Node.class);
+        NodeList childNodes = mock(NodeList.class);
+
+        when(document.evaluate("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID", document, any())).thenReturn(sfoIdNodes);
+        when(sfoIdNodes.getLength()).thenReturn(1);
+        when(sfoIdNodes.item(0)).thenReturn(sfoIdNode);
+
+        when(sfoIdNode.hasChildNodes()).thenReturn(true);
+        when(sfoIdNode.getChildNodes()).thenReturn(childNodes);
+        when(childNodes.getLength()).thenReturn(1);
+        when(childNodes.item(0).getNodeName()).thenReturn("SFO_ID");
+        when(childNodes.item(0).getTextContent()).thenReturn("78460");
+
+        when(appProperties.getProperty("FAMILY_BASE_SFO_ID")).thenReturn("78460");
+
+        // Act
+        String result = handler.process(document, "some_status");
+
+        // Assert
+        assertEquals("P", result);
+    }
+
+    @Test
+    public void testProcessWithException() throws Exception {
+        // Arrange
+        Document document = mock(Document.class);
+
+        when(document.evaluate("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID", document, any()))
+                .thenThrow(new RuntimeException("Test Exception"));
+
+        // Act
+        String result = handler.process(document, "some_status");
+
+        // Assert
+        assertEquals("P", result);
+        // Additionally, you might want to assert the log messages or other behaviors during exception handling
+    }
 }
