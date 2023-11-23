@@ -1,109 +1,129 @@
-import com.vzw.cc.valueobjects.AuditInfo;
-import com.vzw.cc.valueobjects.TranLog;
-import org.apache.xmlbeans.XmlObject;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-public class AuditInfoTest {
+import java.io.File;
+
+import org.junit.jupiter.api.Test;
+
+class GeneralUtilitiesTest {
 
     @Test
-    public void testConstructor() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Check if the uniqueId is set correctly
-        assertEquals(1L, auditInfo.getUniqueId());
+    void capFirst() {
+        assertEquals("Test", GeneralUtilities.capFirst("test"));
+        assertEquals("Abc", GeneralUtilities.capFirst("abc"));
+        assertEquals("A", GeneralUtilities.capFirst("a"));
+        assertNull(GeneralUtilities.capFirst(null));
     }
 
     @Test
-    public void testSetGeneralInfoWithRequestTS() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Set general info with request timestamp
-        auditInfo.setGeneralInfo("APP1", "Service1", "2023-01-01T12:00:00");
-
-        // Check if the general info is set correctly
-        assertEquals("APP1", auditInfo.getAppl_id());
-        assertEquals("Service1", auditInfo.getService_name());
-        assertEquals("2023-01-01T12:00:00", auditInfo.getRequest_TS());
+    void qualifiedToSimple() {
+        assertEquals("TestClass", GeneralUtilities.qualifiedToSimple("com.example.TestClass"));
+        assertEquals("Simple", GeneralUtilities.qualifiedToSimple("Simple"));
+        assertNull(GeneralUtilities.qualifiedToSimple(null));
     }
 
     @Test
-    public void testSetGeneralInfoWithoutRequestTS() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Set general info without request timestamp
-        auditInfo.setGeneralInfo("APP2", "Service2");
-
-        // Check if the general info is set correctly
-        assertEquals("APP2", auditInfo.getAppl_id());
-        assertEquals("Service2", auditInfo.getService_name());
-        assertNull(auditInfo.getRequest_TS());
+    void toJavaClassName() {
+        assertEquals("TestClassName", GeneralUtilities.toJavaClassName("test-class-name"));
+        assertEquals("AbcDef", GeneralUtilities.toJavaClassName("abc-def"));
+        assertEquals("Single", GeneralUtilities.toJavaClassName("single"));
+        assertNull(GeneralUtilities.toJavaClassName(null));
     }
 
     @Test
-    public void testSetBusinessInfo() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-        XmlObject mockAuditLog = /* Create a mock XmlObject for testing */;
-
-        // Set business info
-        auditInfo.setBusinessInfo(mockAuditLog);
-
-        // Check if the business info is set correctly
-        assertEquals(mockAuditLog, auditInfo.getBusinessInfo());
+    void toJavaFieldName() {
+        assertEquals("testFieldName", GeneralUtilities.toJavaFieldName("test-field-name"));
+        assertEquals("abcDef", GeneralUtilities.toJavaFieldName("abc-def"));
+        assertEquals("single", GeneralUtilities.toJavaFieldName("single"));
+        assertNull(GeneralUtilities.toJavaFieldName(null));
     }
 
     @Test
-    public void testAddTransWithLongClassName() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Add a transaction with a long class name
-        auditInfo.addTrans("Type1", "VeryLongClassNameThatExceedsMaxLength", "Method1", "Request", "Response", "2023-01-01T12:00:00", 100L, "System1", "Success");
-
-        // Check if the class name is truncated to the maximum length
-        List<TranLog> tranLogs = auditInfo.getTranLogs();
-        assertEquals("...ClassNameThatExceedsMaxLength", tranLogs.get(0).get(TranLog.class_name));
+    void toJavaPackage() {
+        assertEquals("com.example.testpackage", GeneralUtilities.toJavaPackage("com.example.test-package"));
+        assertEquals("com.example.test", GeneralUtilities.toJavaPackage("com.example.test"));
+        assertNull(GeneralUtilities.toJavaPackage(null));
     }
 
     @Test
-    public void testAddTransAndCheckListNotNull() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Add a transaction
-        auditInfo.addTrans("Type2", "Class2", "Method2", "Request2", "Response2", "2023-01-01T12:01:00", 150L, "System2", "Failure");
-
-        // Check if the transaction list is not null
-        assertNotNull(auditInfo.getTranLogs());
+    void packageToFolder() {
+        assertEquals("com\\example\\testpackage", GeneralUtilities.packageToFolder("com.example.testpackage"));
+        assertEquals("com\\example\\test", GeneralUtilities.packageToFolder("com.example.test"));
+        assertNull(GeneralUtilities.packageToFolder(null));
     }
-
-    // Add more test cases for other methods in AuditInfo class...
 
     @Test
-    public void testAddTransWithNullValues() {
-        AuditInfo auditInfo = new AuditInfo(1L);
-
-        // Add a transaction with null values
-        auditInfo.addTrans(null, null, null, null, null, null, null, null, null);
-
-        // Check if the transaction is added with null values
-        List<TranLog> tranLogs = auditInfo.getTranLogs();
-        assertNotNull(tranLogs);
-        assertEquals(1, tranLogs.size());
-        TranLog addedTrans = tranLogs.get(0);
-        assertNull(addedTrans.get(TranLog.trns_type));
-        assertNull(addedTrans.get(TranLog.class_name));
-        assertNull(addedTrans.get(TranLog.method_name));
-        assertNull(addedTrans.get(TranLog.req_input));
-        assertNull(addedTrans.get(TranLog.resp_output));
-        assertNull(addedTrans.get(TranLog.req_ts));
-        assertNull(addedTrans.get(TranLog.response_time));
-        assertNull(addedTrans.get(TranLog.ext_system));
-        assertNull(addedTrans.get(TranLog.status));
+    void toXSDName() {
+        assertEquals("xsd:TestClassName", GeneralUtilities.toXSDName("test-class-name"));
+        assertEquals("xsd:AbcDef", GeneralUtilities.toXSDName("abc-def"));
+        assertEquals("xsd:Single", GeneralUtilities.toXSDName("single"));
+        assertNull(GeneralUtilities.toXSDName(null));
     }
-    
-    // Add more test cases for other methods in AuditInfo class...
+
+    @Test
+    void uscoretoHypen() {
+        assertEquals("test-class-name", GeneralUtilities.uscoretoHypen("test_class_name"));
+        assertEquals("abc-def", GeneralUtilities.uscoretoHypen("abc_def"));
+        assertEquals("single", GeneralUtilities.uscoretoHypen("single"));
+        assertNull(GeneralUtilities.uscoretoHypen(null));
+    }
+
+    @Test
+    void hypenToUscore() {
+        assertEquals("test_class_name", GeneralUtilities.hypenToUscore("test-class-name"));
+        assertEquals("abc_def", GeneralUtilities.hypenToUscore("abc-def"));
+        assertEquals("single", GeneralUtilities.hypenToUscore("single"));
+        assertNull(GeneralUtilities.hypenToUscore(null));
+    }
+
+    @Test
+    void removeExt() {
+        assertEquals("filename", GeneralUtilities.removeExt("filename.txt"));
+        assertEquals("filename", GeneralUtilities.removeExt("filename"));
+        assertNull(GeneralUtilities.removeExt(null));
+    }
+
+    @Test
+    void removeFolder() {
+        assertEquals("filename.txt", GeneralUtilities.removeFolder("C:\\path\\to\\filename.txt"));
+        assertEquals("filename", GeneralUtilities.removeFolder("filename"));
+        assertNull(GeneralUtilities.removeFolder(null));
+    }
+
+    @Test
+    void folderToPackage() {
+        assertEquals("com.example.testpackage", GeneralUtilities.folderToPackage("com\\example\\testpackage"));
+        assertEquals("com.example.test", GeneralUtilities.folderToPackage("com\\example\\test"));
+        assertNull(GeneralUtilities.folderToPackage(null));
+    }
+
+    @Test
+    void getFileName() {
+        File file = new File("C:\\path\\to\\com\\reap\\test\\TestClass.java");
+        assertEquals("com.reap.test.TestClass", GeneralUtilities.getFileName(file));
+    }
+
+    @Test
+    void getFileNameWithSuffix() {
+        File file = new File("C:\\path\\to\\com\\reap\\test\\TestClass.java");
+        assertEquals("com.reap.test.suffix.TestClass", GeneralUtilities.getFileName("suffix", "TestClass"));
+    }
+
+    @Test
+    void getClassName() {
+        assertEquals("com.reap.test.TestClass", GeneralUtilities.getClassName(null, "com.reap.test.TestClass"));
+        assertEquals("com.reap.test.suffix.TestClass", GeneralUtilities.getClassName("suffix", "com.reap.test.TestClass"));
+    }
+
+    @Test
+    void getRelativePath() {
+        File base = new File("C:\\path\\to");
+        File file = new File("C:\\path\\to\\com\\reap\\test\\TestClass.java");
+        assertEquals("com/reap/test/TestClass.java", GeneralUtilities.getRelativePath(base, file));
+    }
+
+    @Test
+    void printStackTrace() {
+        Object[] trace = new Object[]{"Class1", "Class2", "Class3"};
+        assertEquals("Class1\nClass2\nClass3\n", GeneralUtilities.printStackTrace(trace));
+    }
 }
