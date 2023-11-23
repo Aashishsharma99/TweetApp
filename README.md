@@ -1,6 +1,7 @@
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,26 +53,20 @@ public class HttpCallDaoTest {
     }
 
     @Test
-    public void testCallHttpGetRedirection() throws Exception {
+    public void testCallHttpGetException() throws Exception {
         // Arrange
         HttpClientParams hcParams = new HttpClientParams();
         HttpClient client = mock(HttpClient.class);
         GetMethod mockGetMethod = mock(GetMethod.class);
-        when(client.executeMethod(mockGetMethod)).thenReturn(301);
-        when(mockGetMethod.getResponseHeader("location").getValue()).thenReturn("http://redirected.com");
-        GetMethod mockRedirectMethod = mock(GetMethod.class);
-        when(client.executeMethod(mockRedirectMethod)).thenReturn(200);
-        when(mockRedirectMethod.getResponseBodyAsString()).thenReturn("Redirected Response");
+        when(client.executeMethod(mockGetMethod)).thenThrow(new IOException("Simulated IOException"));
 
         // Act
         String result = HttpCallDao.callHttpGet("http://example.com", "param=value", hcParams, client);
 
         // Assert
-        assertEquals("Redirected Response", result);
+        assertEquals("", result);
         verify(client).executeMethod(mockGetMethod);
-        verify(client).executeMethod(mockRedirectMethod);
         verify(mockGetMethod).releaseConnection();
-        verify(mockRedirectMethod).releaseConnection();
     }
 
     @Test
@@ -110,19 +105,18 @@ public class HttpCallDaoTest {
     }
 
     @Test
-    public void testCallHttpPostWithRequestBody() throws Exception {
+    public void testCallHttpPostException() throws Exception {
         // Arrange
         HttpClientParams hcParams = new HttpClientParams();
         HttpClient client = mock(HttpClient.class);
         PostMethod mockPostMethod = mock(PostMethod.class);
-        when(client.executeMethod(mockPostMethod)).thenReturn(200);
-        when(mockPostMethod.getResponseBodyAsString()).thenReturn("Mocked Response");
+        when(client.executeMethod(mockPostMethod)).thenThrow(new IOException("Simulated IOException"));
 
         // Act
-        String result = HttpCallDao.callHttpPost("http://example.com", "param=value", hcParams, client);
+        String result = HttpCallDao.callHttpPost("http://example.com", new HashMap<>(), hcParams, client);
 
         // Assert
-        assertEquals("Mocked Response", result);
+        assertEquals("", result);
         verify(client).executeMethod(mockPostMethod);
         verify(mockPostMethod).releaseConnection();
     }
