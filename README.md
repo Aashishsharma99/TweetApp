@@ -1,206 +1,392 @@
-import com.vzw.cc.valueobjects.AuditInfo;
-import com.vzw.cc.valueobjects.TranLog;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+package com.vzw.cc.util;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
-@ExtendWith(MockitoExtension.class)
-class AuditInfoTest {
+import org.apache.commons.httpclient.DefaultHttpMethodRetryHandler;
+import org.apache.commons.httpclient.Header;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Component;
 
-    @InjectMocks
-    private AuditInfo auditInfo;
 
-    @Mock
-    private TranLog tranLogMock;
 
-    @Test
-    void testAddTrans_withValidParameters_shouldCreateTranLogAndAddToLogs() {
-        // Given
-        String transType = "type";
-        String className = "com.example.ClassName";
-        String methodName = "method";
-        String req = "request";
-        String resp = "response";
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
 
-        // Then
-        verify(tranLogMock).put(TranLog.req_id, any());
-        verify(tranLogMock).put(TranLog.seq_no, any(Long.class));
-        verify(tranLogMock).put(TranLog.trns_type, transType);
-        verify(tranLogMock).put(TranLog.class_name, "ClassName");
-        verify(tranLogMock).put(TranLog.method_name, methodName);
-        verify(tranLogMock).put(TranLog.req_input, req);
-        verify(tranLogMock).put(TranLog.resp_output, resp);
-        verify(tranLogMock).put(TranLog.req_ts, reqTS);
-        verify(tranLogMock).put(TranLog.response_time, respTime);
-        verify(tranLogMock).put(TranLog.ext_system, extSystem);
-        verify(tranLogMock).put(TranLog.status, status);
-        verify(auditInfo).addTrans(tranLogMock);
-    }
+@Component
+public class HttpCallDao
+{
+	private static Logger log = LogManager.getLogger(HttpCallDao.class.getName());
+  private static final int HTTP_TIME_OUT = 6000;
+  
+  public static String callHttpGet(String urlString, String queryData, int timeOut) {
+    HttpClientParams hcParams = new HttpClientParams();
+    hcParams.setSoTimeout(timeOut);
+    return callHttpGet(urlString, queryData, hcParams);
+  }
 
-    @Test
-    void testAddTrans_withNullTransLog_shouldNotAddToLogs() {
-        // When
-        auditInfo.addTrans((TranLog) null);
 
-        // Then
-        verify(auditInfo).addTrans(any(TranLog.class)); // Verify that addTrans method is called with any TranLog instance
-    }
 
-    @Test
-    void testAddTrans_withNullClassName_shouldCreateTranLogWithEmptyClassName() {
-        // Given
-        String transType = "type";
-        String methodName = "method";
-        String req = "request";
-        String resp = "response";
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
 
-        // When
-        auditInfo.addTrans(transType, null, methodName, req, resp, reqTS, respTime, extSystem, status);
+  
+  public static String callHttpGet(String urlString, String queryData) {
+    HttpClientParams hcParams = new HttpClientParams();
+    hcParams.setSoTimeout(6000);
+    hcParams.setConnectionManagerTimeout(6000L);
+    return callHttpGet(urlString, queryData, hcParams);
+  }
 
-        // Then
-        verify(tranLogMock).put(TranLog.class_name, ""); // Verify that class_name is set to an empty string
-    }
+  
+  public static String callHttpGet(String urlString, String queryData, HttpClientParams hcParams) {
+    HttpClient client = new HttpClient(hcParams);
+    GetMethod httpcall = new GetMethod(urlString);
+    httpcall.setQueryString(queryData);
+    String responseString = "";
+    
+    try {
+      log.debug("Making http call");
+      client.executeMethod(httpcall);
+      log.debug("http status = " + httpcall.getStatusCode());
+      if (httpcall.getStatusCode() == 200) {
+        responseString = httpcall.getResponseBodyAsString();
+      } else {
+        
+        String errString = httpcall.getStatusLine().toString();
+        log.error("MakingHttpCall", "HttpCallDao", "callHttpGet", "Error: callHttpGet(): " + errString, "Error", null);
+      } 
+    } catch (Exception e) {
+      log.error("MakingHttpCall", "HttpCallDao", "callHttpGet", "EXCEPTION: callHttpGet(): " + e.toString(), "Error", e);
+    } finally {
+      httpcall.releaseConnection();
+    } 
+    return responseString;
+  }
+  
+  public static String callHttpPost(String urlString, String data) {
+    int equalIndex = -1;
+    String responseString = "";
+    if ((equalIndex = data.indexOf('=')) != -1) {
+      HashMap<String, String> hm = new HashMap<String, String>();
+      hm.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+      HttpClientParams hcParams = new HttpClientParams();
+      responseString = callHttpPost(urlString, hm, hcParams);
+    } else {
+      log.info("callHttpPost: Aborted: xmlreqdoc= is required in data");
+    }  return responseString;
+  }
+  
+  public static String callHttpPost(String urlString, String data, int timeOut) {
+    int equalIndex = -1;
+    String responseString = "";
+    if ((equalIndex = data.indexOf('=')) != -1) {
+      HashMap<String, String> hm = new HashMap<String, String>();
+      hm.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+      HttpClientParams hcParams = new HttpClientParams();
+      responseString = callHttpPost(urlString, hm, hcParams, timeOut);
+    } else {
+      log.info("callHttpPost: Aborted: xmlreqdoc= is required in data");
+    }  return responseString;
+  }
+  
+  public static String callHttpPost(String urlString, Map<String, String> queryData) {
+    HttpClientParams hcParams = new HttpClientParams();
+    return callHttpPost(urlString, queryData, hcParams);
+  }
 
-    @Test
-    void testAddTrans_withLongClassName_shouldTruncateClassName() {
-        // Given
-        String transType = "type";
-        String className = "com.example.really.long.class.name";
-        String methodName = "method";
-        String req = "request";
-        String resp = "response";
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
+  
+  public static String callHttpPost(String urlString, Map<String, String> queryData, int timeOut) {
+    HttpClientParams hcParams = new HttpClientParams();
+    return callHttpPost(urlString, queryData, hcParams, timeOut);
+  }
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
 
-        // Then
-        verify(tranLogMock).put(TranLog.class_name, "class.name"); // Verify that class_name is truncated
-    }
+  
+  public static String callHttpPost(String urlString, Map<String, String> queryData, HttpClientParams hcParams) { return callHttpPost(urlString, queryData, hcParams, 6000); }
 
-    @Test
-    void testAddTrans_withMaxLengthReq_shouldTruncateReqInput() {
-        // Given
-        String transType = "type";
-        String className = "com.example.ClassName";
-        String methodName = "method";
-        String req = "a".repeat(AuditInfo.MAX_LENGTH + 1); // Exceeds the maximum length
-        String resp = "response";
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
+  
+  public static String callHttpPost(String urlString, int timeOut) {
+    HttpClientParams hcParams = new HttpClientParams();
+    HashMap<String, String> hm = new HashMap<String, String>();
+    return callHttpPost(urlString, hm, hcParams, timeOut);
+  }
+  
+  public static String callHTTPBodyPost(String urlString, String body, int timeOut) {
+    HttpClientParams hcParams = new HttpClientParams();
+    hcParams.setSoTimeout(timeOut);
+    hcParams.setConnectionManagerTimeout(timeOut);
+    HttpClient client = new HttpClient(hcParams);
+    
+    client.setConnectionTimeout(timeOut);
+    PostMethod httpcall = new PostMethod(urlString);
+    String responseString = "";
+    try {
+      httpcall.setRequestEntity(new StringRequestEntity(body, null, null));
+      client.executeMethod(httpcall);
+      if (httpcall.getStatusCode() == 200) {
+        responseString = httpcall.getResponseBodyAsString();
+      } else {
+        String errString = httpcall.getStatusLine().toString();
+        log.error("MakingHttpCall", "HttpCallDao", "callHTTPBodyPost", "Error: callHTTPBodyPost(): " + errString, "Error", null);
+      } 
+    } catch (Exception e) {
+      log.error("MakingHttpCall", "HttpCallDao", "callHTTPBodyPost", "EXCEPTION: callHTTPBodyPost(): " + e.toString(), "Error", e);
+    } finally {
+      httpcall.releaseConnection();
+    } 
+    return responseString;
+  }
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
 
-        // Then
-        verify(tranLogMock).put(TranLog.req_input, req.substring(0, AuditInfo.MAX_LENGTH - 1)); // Verify truncation
-    }
 
-    @Test
-    void testAddTrans_withNullReq_shouldNotTruncateReqInput() {
-        // Given
-        String transType = "type";
-        String className = "com.example.ClassName";
-        String methodName = "method";
-        String req = null; // Null request
-        String resp = "response";
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
 
-        // Then
-        verify(tranLogMock).put(TranLog.req_input, null); // Verify no truncation
-    }
 
-    @Test
-    void testAddTrans_withLongResp_shouldTruncateRespOutput() {
-        // Given
-        String transType = "type";
-        String className = "com.example.ClassName";
-        String methodName = "method";
-        String req = "request";
-        String resp = "a".repeat(AuditInfo.MAX_LENGTH + 1); // Exceeds the maximum length
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
 
-        // Then
-        verify(tranLogMock).put(TranLog.resp_output, resp.substring(0, AuditInfo.MAX_LENGTH - 1)); // Verify truncation
-    }
+  
+  public static String callHttpPost(String urlString, Map<String, String> queryData, HttpClientParams hcParams, int timeOut) {
+    hcParams.setSoTimeout(timeOut);
+    hcParams.setConnectionManagerTimeout(timeOut);
+    HttpClient client = new HttpClient(hcParams);
+    client.setConnectionTimeout(timeOut);
+    PostMethod httpcall = new PostMethod(urlString);
+    Iterator<String> it1 = queryData.keySet().iterator();
+    String key = null;
+    while (it1.hasNext()) {
+      key = (String)it1.next();
+      httpcall.setParameter(key, (String)queryData.get(key));
+    } 
+    String responseString = "";
+    try {
+      log.debug("Making http call");
+      client.executeMethod(httpcall);
+      log.debug("http status = " + httpcall.getStatusCode());
+      if (httpcall.getStatusCode() == 200)
+      { responseString = httpcall.getResponseBodyAsString(); }
+      
+      else if (httpcall.getStatusCode() == 301 || httpcall.getStatusCode() == 302 || 
+        httpcall.getStatusCode() == 307)
+      
+      { String redirectLocation = "";
+        String redirectQueryData = "";
+        Header locationHeader = httpcall.getResponseHeader("location");
+        if (locationHeader != null) {
+        	PostMethod redirectHTTPCall = new PostMethod();
+          try {
+            log.debug("HTTP location header: " + locationHeader);
+            redirectLocation = locationHeader.getValue();
+            int queryIndex = -1;
+            
+            redirectQueryData = URLDecoder.decode(redirectLocation.substring(queryIndex + 1, redirectLocation.length()), "UTF-8");
+            log.debug("redirectQueryData: " + redirectQueryData);
+            redirectLocation = redirectLocation.substring(0, queryIndex);
+            int equalIndex = -1;
+            if ((queryIndex = redirectLocation.indexOf('?')) != -1 && (equalIndex = redirectQueryData.indexOf('=')) != -1) {
+              String redirectQueryDataName = redirectQueryData.substring(0, equalIndex);
+              String redirectQueryDataValue = redirectQueryData.substring(equalIndex + 1, redirectQueryData.length());
+              log.debug("redirectQueryDataName: " + redirectQueryDataName);
+              log.debug("redirectQueryDataValue: " + redirectQueryDataValue);
+              redirectHTTPCall.setParameter(redirectQueryDataName, redirectQueryDataValue);
+              NameValuePair[] nvp = redirectHTTPCall.getParameters();
+              log.debug("length(NameValuePair) = " + nvp.length);
+              for (int i = 0; i < nvp.length; i++) {
+                log.debug("NameValuePair[" + i + "] " + nvp[i].getName() + " = " + nvp[i].getValue());
+              }
+            } 
+            
+            redirectHTTPCall.setURI(new URI(redirectLocation, false));
+            log.debug("Making http redirect call to " + redirectLocation);
+            client.executeMethod(redirectHTTPCall);
+            log.debug("http status = " + redirectHTTPCall.getStatusCode());
+            if (redirectHTTPCall.getStatusCode() == 200) {
+              responseString = redirectHTTPCall.getResponseBodyAsString();
+            } else {
+              String errString = redirectHTTPCall.getStatusLine().toString();
+              log.error("MakingHttpCall redirect", "HttpCallDao", "callHttpGet", "Error: callHttpGet(): " + errString, "Error", null);
+            } 
+          } catch (Exception e) {
+            log.error("MakingHttpCall redirect", "HttpCallDao", "callHttpGet", "EXCEPTION: callHttpGet(): " + e.toString(), "Error", e);
+          } finally {
+            redirectHTTPCall.releaseConnection();
+          } 
+        } else {
+          log.info("MakingHttpCall: got redirect without location.");
+        }  }
+      else { String errString = httpcall.getStatusLine().toString();
+        log.error("MakingHttpCall", "HttpCallDao", "callHttpGet", "Error: callHttpGet(): " + errString, "Error", null); }
 
-    @Test
-    void testAddTrans_withNullResp_shouldNotTruncateRespOutput() {
-        // Given
-        String transType = "type";
-        String className = "com.example.ClassName";
-        String methodName = "method";
-        String req = "request";
-        String resp = null; // Null response
-        String reqTS = "timestamp";
-        Long respTime = 100L;
-        String extSystem = "external";
-        String status = "success";
+    
+    } catch (Exception e) {
+      log.error("MakingHttpCall", "HttpCallDao", "callHttpGet", "EXCEPTION: callHttpGet(): " + e.toString(), "Error", e);
+    } finally {
+      httpcall.releaseConnection();
+    } 
+    return responseString;
+  }
 
-        // When
-        auditInfo.addTrans(transType, className, methodName, req, resp, reqTS, respTime, extSystem, status);
+  
+  public static String SubmitXmlToUrl(String submitUrl, String inXML) {
+    String Tresponse = null;
+    
+    PrintWriter out = null;
+    BufferedReader in = null;
+    URL subUrl = null;
+    URLConnection subUrlConnection = null;
+    try {
+      log.debug("Submit URL: " + submitUrl);
+      log.debug("Request XML submitted: " + inXML);
+      
+      subUrl = new URL(submitUrl);
+      subUrlConnection = subUrl.openConnection();
+      
+      subUrlConnection.setDoOutput(true);
+      subUrlConnection.setUseCaches(false);
+      subUrlConnection.setRequestProperty("Content-Length", 
+          Integer.toString(inXML.length()));
+      subUrlConnection.setRequestProperty("Content-Type", "text/xml");
+      out = new PrintWriter(subUrlConnection.getOutputStream());
+      out.println(inXML);
+      out.flush();
+      out.close();
+    } catch (Exception e) {
+      
+      log.debug("Unable to open the URL: " + e.getMessage());
+      log.error("MakingHttpCall", "HttpCallDao", "SubmitXmlToUrl", "EXCEPTION: SubmitXmlToUrl(): " + e.toString(), "Error", e);
+    } 
+    
+    try {
+      in = new BufferedReader(new InputStreamReader(subUrlConnection.getInputStream()));
+      StringBuffer ToutputStr = new StringBuffer();
+      String ToutputString;
+      while ((ToutputString = in.readLine()) != null) {
+        ToutputStr.append(ToutputString);
+      }
+      Tresponse = ToutputStr.toString();
+    } catch (Exception e) {
+      
+      log.debug("Response Error: " + in + e.getMessage());
+      log.error("MakingHttpCall", "HttpCallDao", "SubmitXmlToUrl", "EXCEPTION: SubmitXmlToUrl(): " + e.toString(), "Error", e);
+    } 
+    return Tresponse;
+  }
+  
+  public static String SubmitXmlToUrlWithTimeOut(String urlString, String queryData, int timeOut) {
+    String responseString = "";
+    PostMethod httpPostCall = new PostMethod(urlString);
+    try {
+      HttpClientParams hcParams = new HttpClientParams();
+      hcParams.setSoTimeout(timeOut);
+      HttpClient client = new HttpClient(hcParams);
+      StringRequestEntity stringRequestEntity = new StringRequestEntity(queryData, "text/xml", "UTF-8");
+      httpPostCall.setRequestEntity(stringRequestEntity);
+      
+      log.debug("Making http post call");
+      client.executeMethod(httpPostCall);
+      
+      log.debug("http status = " + httpPostCall.getStatusCode());
+      if (httpPostCall.getStatusCode() == 200) {
+        responseString = httpPostCall.getResponseBodyAsString();
+      } else {
+        String errString = httpPostCall.getStatusLine().toString();
+        System.out.println("httpPostCall.getStatusLine().toString() : " + errString);
+      }
+    
+    } catch (Exception e) {
+      System.out.println("Exception occured while calling" + e.toString());
+    } finally {
+      
+      httpPostCall.releaseConnection();
+    } 
+    return responseString;
+  }
+  
+  public static String SubmitXmlToUrlWithTimeOutAndRetry(String urlString, String queryData, int timeOut, int retryCount) {
+    String responseString = "";
+    PostMethod httpPostCall = new PostMethod(urlString);
+    try {
+      HttpClientParams hcParams = new HttpClientParams();
+      hcParams.setSoTimeout(timeOut);
+      hcParams.setConnectionManagerTimeout(timeOut);
+      hcParams.setParameter("http.method.retry-handler", new DefaultHttpMethodRetryHandler(retryCount, false));
+      
+      HttpClient client = new HttpClient(hcParams);
+      StringRequestEntity stringRequestEntity = new StringRequestEntity(queryData, "text/xml", "UTF-8");
+      httpPostCall.setRequestEntity(stringRequestEntity);
+      
+      log.debug("Making http post call");
+      client.executeMethod(httpPostCall);
+      
+      log.debug("http status = " + httpPostCall.getStatusCode());
+      if (httpPostCall.getStatusCode() == 200) {
+        responseString = httpPostCall.getResponseBodyAsString();
+      } else {
+        String errString = httpPostCall.getStatusLine().toString();
+        System.out.println("httpPostCall.getStatusLine().toString() : " + errString);
+      }
+    
+    } catch (Exception e) {
+      System.out.println("Exception occured while calling" + e.toString());
+    } finally {
+      
+      httpPostCall.releaseConnection();
+    } 
+    return responseString;
+  }
 
-        // Then
-        verify(tranLogMock).put(TranLog.resp_output, null); // Verify no truncation
-    }
 
-    @Test
-    void testAddTrans_withValidTranLog_shouldAddToLogs() {
-        // Given
-        TranLog validTranLog = new TranLog();
 
-        // When
-        auditInfo.addTrans(validTranLog);
 
-        // Then
-        verify(auditInfo).addTrans(validTranLog); // Verify that addTrans method is called with the provided TranLog
-    }
 
-    @Test
-    void testAddTransLog_withNullTranLog_shouldNotAddToLogs() {
-        // When
-        auditInfo.addTrans((TranLog) null);
 
-        // Then
-        List<TranLog> tranLogs = auditInfo.getTranLogs();
-        assertNotNull(tranLogs);
-        assertEquals(0, tranLogs.size()); // Verify that no TranLog is added
-    }
+  
+  public static String submitXmlToUrlWithTimeOutAndRetryWithTransId(String urlString, String queryData, int timeOut, int retryCount, String transId) {
+    log.info(" submit  With Trans Id  as parameter");
+    String responseString = "";
+    PostMethod httpPostCall = new PostMethod(String.valueOf(urlString) + "?transId=" + transId);
+    
+    try {
+      HttpClientParams hcParams = new HttpClientParams();
+      hcParams.setSoTimeout(timeOut);
+      hcParams.setConnectionManagerTimeout(timeOut);
+      hcParams.setParameter("http.method.retry-handler", new DefaultHttpMethodRetryHandler(retryCount, false));
 
-    // Add more test cases as needed
-
-}
+      
+      HttpClient client = new HttpClient(hcParams);
+      StringRequestEntity stringRequestEntity = new StringRequestEntity(queryData, null, "UTF-8");
+      
+      httpPostCall.setRequestEntity(stringRequestEntity);
+      
+      log.info(" Making http post call");
+      client.executeMethod(httpPostCall);
+      
+      log.info(" http status = " + httpPostCall.getStatusCode());
+      if (httpPostCall.getStatusCode() == 200) {
+        responseString = httpPostCall.getResponseBodyAsString();
+      } else {
+        String errString = httpPostCall.getStatusLine().toString();
+        log.info("Anila: httpPostCall.getStatusLine().toString() : " + errString);
+      }
+    
+    } catch (Exception e) {
+      log.info("Anila: Exception occured while calling" + e.toString());
+    } finally {
+      
+      httpPostCall.releaseConnection();
+    } 
+    return responseString;
+  }
 }
