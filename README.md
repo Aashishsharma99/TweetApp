@@ -1,193 +1,80 @@
-package com.verizon.onemsg.omppservice.util;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.sql.Clob;
-import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.List;
-
-/*
- * Created on Aug 1, 2007
- *
- * TODO To change the template for this generated file go to
- * Window - Preferences - Java - Code Style - Code Templates
- */
-
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
+import com.verizon.onemsg.omppservice.beans.AuditInfo;
 import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
-import com.verizon.onemsg.omppservice.beans.XSLBean;
-import com.verizon.onemsg.omppservice.entity.XSLTransformerEntity;
-import com.verizon.onemsg.omppservice.properties.AppProperties;
-import com.vzw.cc.valueobjects.AuditInfo;
+import com.verizon.onemsg.omppservice.util.CommonUtils;
+import com.verizon.onemsg.omppservice.util.HttpCall;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-/**
- * @author beherp
- *
- */
-@Component
-public class CommonUtils {	
-	
-	@Value("${BOS_AUTH_USERNAME}")
-	private String bosUserName;
-	
-	@Value("${BOS_AUTH_PASSWORD}")
-	 String bosPassword;
-	
-	@Value("${BOS_PC_SERVICES_HTTP_TIMEOUT}")
-	String bosBosPcHttpTimeout;
-	
-	@Value("${BOS_PC_SERVICE_ACTIVATE_ENDPOINT}")
-	String bosPcServiceActivateEndpoint;
-	
-	@Value("${BOS_PC_SERVICE_DEACTIVATE_ENDPOINT}")
-	String bosPcServiceDeactivateEndPoint;
-	
-	@Value("${APP_ID}")
-	String appId;
-	
-	@Value("${ENV}")
-	private static String environment;
-	
-	@Autowired
-	AppProperties props;
-	
-	@Autowired
-	HttpCall httpCall;
-	
-	private Logger log = LogManager.getLogger(CommonUtils.class.getName());
-	
-	
-    public static String padWithZeros(String value, int size){
-		
-		if (value == null){
-			value = "";
-		}
-		
-		StringBuffer buffer = new StringBuffer(value);
-		
-		if(value != null && value.length() >= size){
-			return value;
-		}else{
-			for(int i = value.length(); i < size ; i++ ){
-				buffer.insert(0, '0');
-			}
-		}
-		
-		return buffer.toString();
-	}
-    
-    
-    /**
-     * Include JavaDocs please!
-     *
-     * @param doc DOCUMENT ME!
-     *
-     * @return DOCUMENT ME!
-     */
-    public  String makeCallToBOSPreferenceCenter(final String activityType , BOSAccountBean bean , AuditInfo auditInfo) {
-        String bosPcEndPoint = null;
-        final String USERNAME = bosUserName;
-        final String PASSWORD = bosPassword;
-        final int timeOut = Integer.parseInt(bosBosPcHttpTimeout);
-        String status = null;
-        String queryData = null;
-        ObjectMapper mapper = null;
-        try {
-            mapper = new ObjectMapper();         
-            queryData = mapper.writeValueAsString(bean);    
-            if ("ACTIVATE" .equals(activityType)) {            	
-            	bosPcEndPoint = bosPcServiceActivateEndpoint;
-            	
-            } else if("DEACTIVATE" .equals(activityType)){            	
-            	bosPcEndPoint = bosPcServiceDeactivateEndPoint;
-            }
-            
-            final String USER_PASS = USERNAME + ":" + PASSWORD;
-	    	String basicAuth = "Basic " + new String(new Base64().encode(USER_PASS.getBytes()));
-	    	log.info("Calling BOS Preference Center - queryData : " + queryData);            
-            String responseStr = httpCall.submitJSONToUrl(bosPcEndPoint, queryData, timeOut, basicAuth);
-            log.info("Calling BOS Preference Center - response : " + responseStr);            
-            auditInfo.setSynchResponse(responseStr);
-            if(responseStr != null && responseStr.equals("200")) {
-                status = "P";
-            } else {
-                status = "F";
-            }
-        } catch(Exception ex) {
-        	log.error(appId, "makeCallToBOSPreferenceCenter", CommonUtils.class.getName(), "makeCallToBOSPreferenceCenter", ex.getMessage(), "ERROR", ex);
-            status = "F";
-        } finally {
-        	log.info("makeCallToBOSPreferenceCenter END PROCESS->:status:" + status);
-        	auditInfo.setStatus(status);
-        }
-        return status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.*;
+
+@ExtendWith({MockitoExtension.class, SpringExtension.class})
+class CommonUtilsTest {
+
+    @Mock
+    private HttpCall httpCall;
+
+    @Value("${BOS_AUTH_USERNAME}")
+    private String bosUserName;
+
+    @Value("${BOS_AUTH_PASSWORD}")
+    private String bosPassword;
+
+    @Value("${BOS_PC_SERVICES_HTTP_TIMEOUT}")
+    private String bosBosPcHttpTimeout;
+
+    @Value("${BOS_PC_SERVICE_ACTIVATE_ENDPOINT}")
+    private String bosPcServiceActivateEndpoint;
+
+    @Value("${BOS_PC_SERVICE_DEACTIVATE_ENDPOINT}")
+    private String bosPcServiceDeactivateEndPoint;
+
+    @Value("${APP_ID}")
+    private String appId;
+
+    @Value("${ENV}")
+    private static String environment;
+
+    @InjectMocks
+    private CommonUtils commonUtils;
+
+    @Test
+    void testMakeCallToBOSPreferenceCenter() {
+        // Arrange
+        String activityType = "ACTIVATE";
+        BOSAccountBean bean = new BOSAccountBean(); // Provide necessary data for BOSAccountBean
+        AuditInfo auditInfo = new AuditInfo(); // Provide necessary data for AuditInfo
+
+        // Mocking
+        when(httpCall.submitJSONToUrl(any(), any(), anyInt(), any())).thenReturn("200");
+
+        // Act
+        String result = commonUtils.makeCallToBOSPreferenceCenter(activityType, bean, auditInfo);
+
+        // Assert
+        assertEquals("P", result);
+        // Add more assertions or verifications based on your requirements
     }
-    
-    
-	public boolean  connectToSunMsgServer(final String mailhost) {
 
-		boolean connect = false;
+    @Test
+    void testConnectToSunMsgServer() {
+        // Arrange
+        String mailhost = "your_mailhost_here"; // Provide a valid mailhost
 
-		String env = environment;
-		
-		if ("prod".equalsIgnoreCase(env) && mailhost != null) {
+        // Mocking
+        when(httpCall.submitJSONToUrl(any(), any(), anyInt(), any())).thenReturn("200");
 
-			if (mailhost.contains(props.getProperty("PROD_EAST_MAILHOST_PREFIX"))
-					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "ON"))) {
+        // Act
+        boolean result = commonUtils.connectToSunMsgServer(mailhost);
 
-				connect = true;
-
-			} else if (mailhost.contains(props.getProperty("PROD_WEST_MAILHOST_PREFIX"))
-					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "ON"))) {
-
-				connect = true;
-			}
-		}
-
-		return connect;
-	}
-	
-	
-	
-	/*public HashMap<String,XSLBean> createMap(List<XSLTransformerEntity> listEntity){
-		HashMap<String, XSLBean> xslMap = new HashMap<String, XSLBean>();
-		
-		if(CollectionUtils.isNotEmpty(listEntity)) {
-			for(XSLTransformerEntity entity : listEntity) {
-				if(entity != null ) {
-					if(entity.getXSL() !=null) {
-						Clob xslClob = entity.getXSL();
-					    StringWriter xslString = new StringWriter();
-					    try {								   
-					    	Reader in = xslClob.getCharacterStream();
-							IOUtils.copy(in, xslString);
-							xslMap.put(entity.getKEY(), new XSLBean(entity.getKEY(), entity.getCLASS(), xslString.toString()));
-						} catch (IOException | SQLException e) {
-							// TODO Auto-generated catch block
-							log.info(" Exception accure while convertion "+e.getMessage());							
-						}
-					}
-					else 
-						xslMap.put(entity.getKEY(), new XSLBean(entity.getKEY(), entity.getCLASS(), null));
-				}
-				
-			}
-		}
-		return xslMap = MapUtils.isNotEmpty(xslMap)?xslMap:xslMap;	
-	}	
-*/
-		
+        // Assert
+        // Add assertions based on your requirements
+    }
 }
