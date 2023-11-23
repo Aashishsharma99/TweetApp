@@ -483,3 +483,146 @@ class HttpCallDaoTest {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
+class HttpCallDaoTest {
+
+    // Existing tests...
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
+     */
+    @Test
+    void testCallHttpGet6() {
+        HttpClientParams httpClientParams = mock(HttpClientParams.class);
+        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
+        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
+        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
+        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
+        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
+        verify(httpClientParams).getConnectionManagerClass();
+        verify(httpClientParams).getParameter(any());
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
+     */
+    @Test
+    void testCallHttpGet7() {
+        HttpClientParams httpClientParams = mock(HttpClientParams.class);
+        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
+        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
+        when(httpClientParams.getConnectionManagerClass()).thenReturn(null);
+        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
+        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
+        verify(httpClientParams).getConnectionManagerClass();
+        verify(httpClientParams).getParameter(any());
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
+     */
+    @Test
+    void testCallHttpGet8() {
+        HttpClientParams httpClientParams = mock(HttpClientParams.class);
+        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
+        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
+        when(httpClientParams.getConnectionManagerClass()).thenReturn(HttpCallDao.class);
+        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
+        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpGet("https://example.org/example", "https://example.org/example", httpClientParams));
+        verify(httpClientParams).getConnectionManagerClass();
+        verify(httpClientParams).getParameter(any());
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpGet(String, String, HttpClientParams)}
+     */
+    @Test
+    void testCallHttpGet9() {
+        HttpClientParams httpClientParams = mock(HttpClientParams.class);
+        when(httpClientParams.isAuthenticationPreemptive()).thenReturn(true);
+        when(httpClientParams.getIntParameter(any(), anyInt())).thenReturn(1);
+        when(httpClientParams.getConnectionManagerClass()).thenReturn(Object.class);
+        when(httpClientParams.getConnectionManagerTimeout()).thenReturn(1L);
+        when(httpClientParams.getParameter(any())).thenReturn("Parameter");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpGet("text/xml", "https://example.org/example", httpClientParams));
+        verify(httpClientParams).getConnectionManagerClass();
+        verify(httpClientParams).getParameter(any());
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
+     */
+    @Test
+    void testCallHttpPost6() {
+        HashMap<String, String> stringStringMap = new HashMap<>();
+        stringStringMap.put("Making http call", "42");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHttpPost(String, java.util.Map)}
+     */
+    @Test
+    void testCallHttpPost7() {
+        HashMap<String, String> stringStringMap = new HashMap<>();
+        stringStringMap.put("Key", "42");
+        stringStringMap.put("Making http call", "42");
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHttpPost("https://example.org/example", stringStringMap));
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
+     */
+    @Test
+    void testCallHTTPBodyPost() {
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHTTPBodyPost("https://example.org/example", "https://example.org/example", 1));
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHTTPBodyPost("MakingHttpCall", "https://example.org/example", 1));
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHTTPBodyPost(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT, "https://example.org/example", 1));
+        assertEquals(XpathValueFinder.LBL_ZERO_ZERO_AMOUNT,
+                HttpCallDao.callHTTPBodyPost("text/xml", "https://example.org/example", 1));
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#callHTTPBodyPost(String, String, int)}
+     */
+    @Test
+    void testCallHTTPBodyPost2() {
+        assertThrows(IllegalArgumentException.class,
+                () -> HttpCallDao.callHTTPBodyPost("Url String", "https://example.org/example", 1));
+    }
+
+    /**
+     * Method under test: {@link HttpCallDao#SubmitXmlToUrlWithTimeOutAndRetry(String, String, int, int)}
+     */
+    @Test
+    void testSubmitXmlToUrlWithTimeOutAndRetry2() {
+        assertThrows(IllegalArgumentException.class, () -> HttpCallDao
+                .SubmitXmlToUrlWithTimeOutAndRetry("Making http post call", "https://example.org/example", 1, 3));
+    }
+}
+
