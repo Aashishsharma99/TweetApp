@@ -1,570 +1,102 @@
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(SpringExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;  // Replace 'HttpCallDao' with the actual class containing 'callHttpPost' method.
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void callHttpPost_successful() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        Map<String, String> queryData = new HashMap<>();
-        queryData.put("param1", "value1");
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        String expectedResponse = "MockedResponse";
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
-        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
-
-        // Act
-        String result = httpCallDao.callHttpPost(urlString, queryData, timeOut);
-
-        // Assert
-        assertEquals(expectedResponse, result);
-    }
-
-    @Test
-    void callHttpPost_exception() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        Map<String, String> queryData = new HashMap<>();
-        queryData.put("param1", "value1");
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        String expectedErrorMessage = "Simulated Exception";
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpPost(urlString, queryData, timeOut));
-        assertEquals(expectedErrorMessage, exception.getMessage());
-    }
-}
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(SpringExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;  // Replace 'HttpCallDao' with the actual class containing 'callHttpPost' method.
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void callHttpPost_successful() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        String expectedResponse = "MockedResponse";
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
-        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
-
-        // Act
-        String result = httpCallDao.callHttpPost(urlString, timeOut);
-
-        // Assert
-        assertEquals(expectedResponse, result);
-    }
-
-    @Test
-    void callHttpPost_exception() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        String expectedErrorMessage = "Simulated Exception";
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpPost(urlString, timeOut));
-        assertEquals(expectedErrorMessage, exception.getMessage());
-    }
-}
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(SpringExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;  // Replace 'HttpCallDao' with the actual class containing 'callHTTPBodyPost' method.
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void callHTTPBodyPost_successful() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        String body = "requestBody";
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        hcParams.setConnectionManagerTimeout(timeOut);
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
-
-        // Act
-        String result = httpCallDao.callHTTPBodyPost(urlString, body, timeOut);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-    }
-
-    @Test
-    void callHTTPBodyPost_exception() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        String body = "requestBody";
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        hcParams.setConnectionManagerTimeout(timeOut);
-
-        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException("Simulated Exception"));
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHTTPBodyPost(urlString, body, timeOut));
-        assertEquals("Simulated Exception", exception.getMessage());
-    }
-}
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.params.HttpClientParams;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @SpringBootTest
-class HttpCallDaoTest {
+class FamilyBaseSFOHandlerTest {
 
     @InjectMocks
-    private HttpCallDao httpCallDao;  // Replace 'HttpCallDao' with the actual class containing 'callHttpPost' method.
+    private FamilyBaseSFOHandler familyBaseSFOHandler;
 
     @Mock
-    private HttpClient httpClient;
+    private AppProperties appProperties;
 
     @Mock
-    private PostMethod postMethod;
+    private CommonProcessor commonProcessor;
+
+    @Mock
+    private Document document;
+
+    @Mock
+    private XPath xpath;
+
+    @Mock
+    private XPathExpression xpathExpression;
+
+    @Mock
+    private NodeList nodeList;
+
+    @Mock
+    private Node node;
 
     @Test
-    void callHttpPost_successful() throws IOException {
+    void process_shouldReturnP_whenNoMatchingSFOID() throws Exception {
         // Arrange
-        String urlString = "https://example.com";
-        Map<String, String> queryData = new HashMap<>();
-        queryData.put("param1", "value1");
-        queryData.put("param2", "value2");
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        hcParams.setConnectionManagerTimeout(timeOut);
-
-        when(httpClient.executeMethod(any(PostMethod.class))).thenReturn(200);
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
+        when(xpath.compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID")).thenReturn(xpathExpression);
+        when(xpathExpression.evaluate(document, XPathConstants.NODESET)).thenReturn(nodeList);
+        when(nodeList.getLength()).thenReturn(0);
 
         // Act
-        String result = httpCallDao.callHttpPost(urlString, queryData, hcParams, timeOut);
+        String result = familyBaseSFOHandler.process(document, "status");
 
         // Assert
-        assertEquals("MockedResponse", result);
+        assertEquals("P", result);
+
+        // Verify that the necessary methods were called
+        verify(xpath).compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID");
+        verify(xpathExpression).evaluate(document, XPathConstants.NODESET);
     }
 
     @Test
-    void callHttpPost_redirect() throws IOException {
+    void process_shouldTriggerSMS_whenMatchingSFOIDAndEffectiveDateTagFound() throws Exception {
         // Arrange
-        String urlString = "https://example.com";
-        Map<String, String> queryData = new HashMap<>();
-        queryData.put("param1", "value1");
-        queryData.put("param2", "value2");
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        hcParams.setConnectionManagerTimeout(timeOut);
+        when(xpath.compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID")).thenReturn(xpathExpression);
+        when(xpathExpression.evaluate(document, XPathConstants.NODESET)).thenReturn(nodeList);
+        when(nodeList.getLength()).thenReturn(1);
+        when(nodeList.item(0)).thenReturn(node);
+        when(node.hasChildNodes()).thenReturn(true);
 
-        when(httpClient.executeMethod(any(PostMethod.class))).thenReturn(301);
-        when(postMethod.getResponseHeader("location")).thenReturn(new Header("location", "https://redirected-url.com"));
-        when(httpClient.executeMethod(any(PostMethod.class))).thenReturn(200);
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedRedirectedResponse");
+        // Mocking child nodes
+        NodeList childNodes = mock(NodeList.class);
+        when(node.getChildNodes()).thenReturn(childNodes);
+        when(childNodes.getLength()).thenReturn(1);
+        when(childNodes.item(0)).thenReturn(node);
+        when(node.getNodeName()).thenReturn("SFO_ID");
+        when(node.getTextContent()).thenReturn("78460");
+
+        when(appProperties.getProperty("FAMILY_BASE_SFO_ID")).thenReturn("78460");
+        when(appProperties.getProperty("FAMILY_BASE_ADD_STR")).thenReturn("someNodeName");
+        when(appProperties.getProperty("FAMILY_BASE_SMS_REQ_TYPE")).thenReturn("someSmsReqType");
+
+        // Mocking VisionAlertsProcessor.getNode method
+        when(commonProcessor.triggerSMS(anyLong(), eq("someSmsReqType"))).thenReturn("mockedSmsResponse");
 
         // Act
-        String result = httpCallDao.callHttpPost(urlString, queryData, hcParams, timeOut);
+        String result = familyBaseSFOHandler.process(document, "status");
 
         // Assert
-        assertEquals("MockedRedirectedResponse", result);
+        assertEquals("mockedSmsResponse", result);
+
+        // Verify that the necessary methods were called
+        verify(xpath).compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID");
+        verify(xpathExpression).evaluate(document, XPathConstants.NODESET);
+        verify(commonProcessor).triggerSMS(anyLong(), eq("someSmsReqType"));
     }
 
-    @Test
-    void callHttpPost_exception() throws IOException {
-        // Arrange
-        String urlString = "https://example.com";
-        Map<String, String> queryData = new HashMap<>();
-        queryData.put("param1", "value1");
-        queryData.put("param2", "value2");
-        int timeOut = 6000;
-        HttpClientParams hcParams = new HttpClientParams();
-        hcParams.setSoTimeout(timeOut);
-        hcParams.setConnectionManagerTimeout(timeOut);
-
-        when(httpClient.executeMethod(any(PostMethod.class))).thenThrow(new IOException("Simulated Exception"));
-
-        // Act and Assert
-        Exception exception = assertThrows(IOException.class, () -> httpCallDao.callHttpPost(urlString, queryData, hcParams, timeOut));
-        assertEquals("Simulated Exception", exception.getMessage());
-    }
-}
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import java.io.BufferedReader;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.net.URL;
-import java.net.URLConnection;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;
-
-    @Mock
-    private URLConnection urlConnection;
-
-    @Mock
-    private URL url;
-
-    @Mock
-    private OutputStream outputStream;
-
-    @Mock
-    private BufferedReader bufferedReader;
-
-    @Test
-    void SubmitXmlToUrl_successful() throws Exception {
-        // Arrange
-        String submitUrl = "https://example.com";
-        String inXML = "<xml>data</xml>";
-
-        when(url.openConnection()).thenReturn(urlConnection);
-        when(urlConnection.getOutputStream()).thenReturn(outputStream);
-        when(urlConnection.getInputStream()).thenReturn(bufferedReader);
-        when(bufferedReader.readLine()).thenReturn("MockedResponse");
-
-        // Act
-        String result = httpCallDao.SubmitXmlToUrl(submitUrl, inXML);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-    }
-
-    @Test
-    void SubmitXmlToUrl_exception() throws Exception {
-        // Arrange
-        String submitUrl = "https://example.com";
-        String inXML = "<xml>data</xml>";
-
-        when(url.openConnection()).thenReturn(urlConnection);
-        when(urlConnection.getOutputStream()).thenThrow(new RuntimeException("Simulated Exception"));
-
-        // Act and Assert
-        Exception exception = assertThrows(RuntimeException.class, () -> httpCallDao.SubmitXmlToUrl(submitUrl, inXML));
-        assertEquals("Simulated Exception", exception.getMessage());
-    }
-}
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void SubmitXmlToUrlWithTimeOut_successful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-
-        when(httpClient.executeMethod(any())).thenReturn(200); // Successful response
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
-        when(postMethod.getStatusCode()).thenReturn(200);
-
-        // Act
-        String result = httpCallDao.SubmitXmlToUrlWithTimeOut(urlString, queryData, timeOut);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-    }
-
-    @Test
-    void SubmitXmlToUrlWithTimeOut_unsuccessful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-
-        when(httpClient.executeMethod(any())).thenReturn(500); // Unsuccessful response
-        when(postMethod.getStatusCode()).thenReturn(500);
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.SubmitXmlToUrlWithTimeOut(urlString, queryData, timeOut));
-        assertEquals("Error: http status = 500", exception.getMessage());
-    }
-}
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void SubmitXmlToUrlWithTimeOutAndRetry_successful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-        int retryCount = 3; // Set your retry count
-
-        when(httpClient.executeMethod(any())).thenReturn(200); // Successful response
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
-        when(postMethod.getStatusCode()).thenReturn(200);
-
-        // Act
-        String result = httpCallDao.SubmitXmlToUrlWithTimeOutAndRetry(urlString, queryData, timeOut, retryCount);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-    }
-
-    @Test
-    void SubmitXmlToUrlWithTimeOutAndRetry_unsuccessful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-        int retryCount = 3; // Set your retry count
-
-        when(httpClient.executeMethod(any())).thenReturn(500); // Unsuccessful response
-        when(postMethod.getStatusCode()).thenReturn(500);
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.SubmitXmlToUrlWithTimeOutAndRetry(urlString, queryData, timeOut, retryCount));
-        assertEquals("Error: http status = 500", exception.getMessage());
-    }
-}
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-
-@ExtendWith(MockitoExtension.class)
-@SpringBootTest
-class HttpCallDaoTest {
-
-    @InjectMocks
-    private HttpCallDao httpCallDao;
-
-    @Mock
-    private HttpClient httpClient;
-
-    @Mock
-    private PostMethod postMethod;
-
-    @Test
-    void submitXmlToUrlWithTimeOutAndRetryWithTransId_successful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-        int retryCount = 3; // Set your retry count
-        String transId = "12345";
-
-        when(httpClient.executeMethod(any())).thenReturn(200); // Successful response
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
-        when(postMethod.getStatusCode()).thenReturn(200);
-
-        // Act
-        String result = httpCallDao.submitXmlToUrlWithTimeOutAndRetryWithTransId(urlString, queryData, timeOut, retryCount, transId);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-    }
-
-    @Test
-    void submitXmlToUrlWithTimeOutAndRetryWithTransId_unsuccessful() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-        int retryCount = 3; // Set your retry count
-        String transId = "12345";
-
-        when(httpClient.executeMethod(any())).thenReturn(500); // Unsuccessful response
-        when(postMethod.getStatusCode()).thenReturn(500);
-
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCallDao.submitXmlToUrlWithTimeOutAndRetryWithTransId(urlString, queryData, timeOut, retryCount, transId));
-        assertEquals("Error: http status = 500", exception.getMessage());
-    }
-
-    @Test
-    void submitXmlToUrlWithTimeOutAndRetryWithTransId_withTransId() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String queryData = "<xml>data</xml>";
-        int timeOut = 5000; // Set your timeout value
-        int retryCount = 3; // Set your retry count
-        String transId = "12345";
-
-        when(httpClient.executeMethod(any())).thenReturn(200); // Successful response
-        when(postMethod.getResponseBodyAsString()).thenReturn("MockedResponse");
-        when(postMethod.getStatusCode()).thenReturn(200);
-
-        // Act
-        String result = httpCallDao.submitXmlToUrlWithTimeOutAndRetryWithTransId(urlString, queryData, timeOut, retryCount, transId);
-
-        // Assert
-        assertEquals("MockedResponse", result);
-
-        // Verify that the URL contains the transId
-        verify(httpClient).executeMethod(argThat(argument -> {
-            return argument instanceof PostMethod &&
-                    ((PostMethod) argument).getURI().toString().contains("transId=" + transId);
-        }));
-    }
+    // Add more test cases for different scenarios as needed
 }
