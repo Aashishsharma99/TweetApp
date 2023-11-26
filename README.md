@@ -1,71 +1,83 @@
 package com.vzw.cc.util;
 
-import org.apache.commons.lang3.StringUtils;
+import com.verizon.onemsg.omppservice.util.mail.MailBoxConnector;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.HashMap;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.dom4j.Document;
-import org.dom4j.Node;
 import org.springframework.stereotype.Component;
-
-
+ 
 
 
 
 
 @Component
-public class XpathValueFinder
+public class HttpCaller
 {
-	
-	private static Logger log = LogManager.getLogger(XpathValueFinder.class.getName());	
-  public static final String LBL_FIELD_W_NAME_ATTRIB_NODE = "//field[@name=\"";
-  public static final String LBL_FIELD_W_NAME_ATTRIB_NODE_SUFFIX = "\"]/./@value";
-  public static final String LBL_ZERO_ZERO_AMOUNT = "";
-  
-  public static String getElementValue(Document document, String xPath) {
-    String nodeValue = "";
-    
-    try {
-      Node node = document.selectSingleNode(xPath);
-      if (node == null) {
-        log.debug("findElementValue(): for xPath =" + xPath + ": node NOT found.");
-        log.debug("findElementValue(): Document text=" + document.getText());
-      }
-      else {
-        
-        nodeValue = node.getText();
-        log.debug("findElementValue(): for xPath =" + xPath + ": node found. value =" + nodeValue);
-        if (StringUtils.isEmpty(nodeValue)) {
-          nodeValue = "";
-        }
-      } 
-    } catch (Exception e) {
-      if (document != null) {
-        log.error("", "", "XpathValueFinder", "getElementValue", "EXCEPTION: findElementValue(): " + e.toString(), "Error", e, document.getText());
-      } else {
-        log.error("", "", "XpathValueFinder", "getElementValue", "EXCEPTION: findElementValue(): " + e.toString(), "Error", e);
-      } 
-    }  return nodeValue;
+	private static Logger log = LogManager.getLogger(HttpCaller.class.getName());	  
+  public static String makeCall(String urlString, String data) throws Exception {
+    log.info("makeCall(): STARTED. Using HttpCallDao url=" + urlString);
+    log.info("query data=" + data);
+    String totalResponse = "";
+    int equalIndex = -1;
+    if ((equalIndex = data.indexOf('=')) != -1) {
+      HashMap<String, String> hm = new HashMap<String, String>();
+      hm.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+      totalResponse = HttpCallDao.callHttpPost(urlString, hm);
+    } else {
+      log.info("makeCall(): Aborted: xmlreqdoc= is required in data");
+    }  log.info("makeCall(): DONE.");
+    return totalResponse;
   }
+
+
+
+
+
+
+
+
+
   
-  public static String findAttributeValue(Document document, String attributeValue) {
-    String returnValue = "";
+  public static String makeCallOld(String urlString, String data) throws Exception {
+    log.info("makeCall(): STARTED. url=" + urlString);
+    log.info("query data=" + data);
+    String totalResponse = "";
+    String responseReceived = "";
     
     try {
-      String xPath = "//field[@name=\"" + attributeValue + "\"]/./@value";
-      Node node = document.selectSingleNode(xPath);
+      URL url = new URL(urlString);
+      URLConnection conn = url.openConnection();
+      conn.setDoOutput(true);
+      OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
+      wr.write(data);
+      wr.flush();
+
       
-      if (node == null) {
-        log.debug("findAttributeValue(): for xPath =" + xPath + ": attribute NOT found.");
-      } else {
-        returnValue = node.getStringValue();
-        log.debug("findAttributeValue(): for xPath =" + xPath + ": attribute found. value =" + returnValue);
-        if (StringUtils.isEmpty(returnValue)) {
-          returnValue = "";
-        }
-      } 
-    } catch (Exception e) {
-      log.debug("EXCEPTION: findAttributeValue(): " + e.toString());
+      StringBuffer sb = new StringBuffer();
+      BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+      
+      while ((responseReceived = rd.readLine()) != null) {
+        sb.append(responseReceived);
+      }
+      wr.close();
+      rd.close();
+      
+      totalResponse = sb.toString();
+    }
+    catch (Exception e) {
+      log.warn("makeCall(): EXCEPTION: " + e.toString());
+      responseReceived = e.toString();
+      throw e;
     } 
-    return returnValue;
+    log.info("makeCall(): DONE.");
+
+    
+    return totalResponse;
   }
 }
