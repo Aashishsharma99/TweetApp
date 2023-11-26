@@ -1,169 +1,478 @@
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.params.HttpClientParams;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.List;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
-class UniqueIdGeneratorTest {
+class HttpCallDaoTest {
 
     @InjectMocks
-    private UniqueIdGenerator uniqueIdGenerator;
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private GetMethod getMethod;
 
     @Test
-    void getUniqId_successful() {
+    void callHttpGet_successful() throws IOException {
         // Arrange
-        System.setProperty("server.id", "01"); // Replace with the expected value for testing
-        Thread.currentThread().setName("TestThread"); // Replace with the expected value for testing
-        int totalUniqNosNeeded = 5;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        int timeOut = 6000;
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.getParams()).thenReturn(new HttpClientParams());
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(getMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
 
         // Act
-        List<String> uniqIds = uniqueIdGenerator.getUniqId(totalUniqNosNeeded);
+        String result = httpCallDao.callHttpGet(urlString, queryData, timeOut);
 
         // Assert
-        assertEquals(totalUniqNosNeeded, uniqIds.size());
-        for (String uniqId : uniqIds) {
-            // Validate the format of the generated unique ID
-            // You may need to adjust this based on the actual format in your implementation
-            assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
-            // Add more validations as needed
-        }
+        assertEquals(expectedResponse, result);
     }
 
     @Test
-    void getUniqId_exception() {
+    void callHttpGet_exception() throws IOException {
         // Arrange
-        System.setProperty("server.id", null); // Set server.id to null to simulate an exception
-        Thread.currentThread().setName(null); // Set thread name to null to simulate an exception
-        int totalUniqNosNeeded = 5;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        int timeOut = 6000;
+        String expectedErrorMessage = "Simulated Exception";
 
-        // Act
-        List<String> uniqIds = uniqueIdGenerator.getUniqId(totalUniqNosNeeded);
+        when(httpClient.getParams()).thenReturn(new HttpClientParams());
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
 
-        // Assert
-        assertEquals(0, uniqIds.size()); // Since an exception is simulated, the list should be empty
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpGet(urlString, queryData, timeOut));
+        assertEquals(expectedErrorMessage, exception.getMessage());
     }
 }
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.params.HttpClientParams;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.List;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
-class UniqueIdGeneratorTest {
+class HttpCallDaoTest {
 
     @InjectMocks
-    private UniqueIdGenerator uniqueIdGenerator;
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private GetMethod getMethod;
 
     @Test
-    void get21DigitUniqId_successful() {
+    void callHttpGet_successful() throws IOException {
         // Arrange
-        System.setProperty("server.id", "01"); // Replace with the expected value for testing
-        Thread.currentThread().setName("TestThread"); // Replace with the expected value for testing
-        int totalUniqNosNeeded = 5;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.getParams()).thenReturn(new HttpClientParams());
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(getMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
 
         // Act
-        List<String> uniqIds = uniqueIdGenerator.get21DigitUniqId(totalUniqNosNeeded);
+        String result = httpCallDao.callHttpGet(urlString, queryData);
 
         // Assert
-        assertEquals(totalUniqNosNeeded, uniqIds.size());
-        for (String uniqId : uniqIds) {
-            // Validate the format of the generated unique ID
-            // You may need to adjust this based on the actual format in your implementation
-            assertEquals(21, uniqId.length()); // Assuming the length of the ID is 21 characters
-            // Add more validations as needed
-        }
+        assertEquals(expectedResponse, result);
     }
 
     @Test
-    void get21DigitUniqId_exception() {
+    void callHttpGet_exception() throws IOException {
         // Arrange
-        System.setProperty("server.id", null); // Set server.id to null to simulate an exception
-        Thread.currentThread().setName(null); // Set thread name to null to simulate an exception
-        int totalUniqNosNeeded = 5;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        String expectedErrorMessage = "Simulated Exception";
 
-        // Act
-        List<String> uniqIds = uniqueIdGenerator.get21DigitUniqId(totalUniqNosNeeded);
+        when(httpClient.getParams()).thenReturn(new HttpClientParams());
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
 
-        // Assert
-        assertEquals(0, uniqIds.size()); // Since an exception is simulated, the list should be empty
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpGet(urlString, queryData));
+        assertEquals(expectedErrorMessage, exception.getMessage());
     }
 }
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.params.HttpClientParams;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.util.List;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest
-class UniqueIdGeneratorTest {
+class HttpCallDaoTest {
 
     @InjectMocks
-    private UniqueIdGenerator uniqueIdGenerator;
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private GetMethod getMethod;
 
     @Test
-    void getUniqId_successful() {
+    void callHttpGet_successful() throws IOException {
         // Arrange
-        int totalUniqNosNeeded = 1;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(getMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
 
         // Act
-        String uniqId = uniqueIdGenerator.getUniqId();
+        String result = httpCallDao.callHttpGet(urlString, queryData, hcParams);
 
         // Assert
-        assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
-        // Add more validations as needed
+        assertEquals(expectedResponse, result);
     }
 
     @Test
-    void get21DigitUniqId_successful() {
+    void callHttpGet_exception() throws IOException {
         // Arrange
-        int totalUniqNosNeeded = 1;
+        String urlString = "https://example.com";
+        String queryData = "param1=value1";
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedErrorMessage = "Simulated Exception";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
+
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpGet(urlString, queryData, hcParams));
+        assertEquals(expectedErrorMessage, exception.getMessage());
+    }
+}
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class HttpCallDaoTest {
+
+    @InjectMocks
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private PostMethod postMethod;
+
+    @Test
+    void callHttpPost_successful() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        String data = "param1=value1";
+        int equalIndex = data.indexOf('=');
+        Map<String, String> postData = new HashMap<>();
+        postData.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
 
         // Act
-        String uniqId = uniqueIdGenerator.get21DigitUniqId();
+        String result = httpCallDao.callHttpPost(urlString, data);
 
         // Assert
-        assertEquals(21, uniqId.length()); // Assuming the length of the ID is 21 characters
-        // Add more validations as needed
+        assertEquals(expectedResponse, result);
     }
 
     @Test
-    void getUniqIds_successful() {
+    void callHttpPost_exception() throws IOException {
         // Arrange
-        int totalUniqNosNeeded = 5;
+        String urlString = "https://example.com";
+        String data = "param1=value1";
+        int equalIndex = data.indexOf('=');
+        Map<String, String> postData = new HashMap<>();
+        postData.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedErrorMessage = "Simulated Exception";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
+
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpPost(urlString, data));
+        assertEquals(expectedErrorMessage, exception.getMessage());
+    }
+}
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class HttpCallDaoTest {
+
+    @InjectMocks
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private PostMethod postMethod;
+
+    @Test
+    void callHttpPost_successful() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        String data = "param1=value1";
+        int timeOut = 6000;
+        int equalIndex = data.indexOf('=');
+        Map<String, String> postData = new HashMap<>();
+        postData.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+        HttpClientParams hcParams = new HttpClientParams();
+        hcParams.setSoTimeout(timeOut);
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
 
         // Act
-        List<String> uniqIds = uniqueIdGenerator.getUniqIds(totalUniqNosNeeded);
+        String result = httpCallDao.callHttpPost(urlString, data, timeOut);
 
         // Assert
-        assertEquals(totalUniqNosNeeded, uniqIds.size());
-        for (String uniqId : uniqIds) {
-            // Validate the format of the generated unique ID
-            // You may need to adjust this based on the actual format in your implementation
-            assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
-            // Add more validations as needed
-        }
+        assertEquals(expectedResponse, result);
+    }
+
+    @Test
+    void callHttpPost_exception() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        String data = "param1=value1";
+        int timeOut = 6000;
+        int equalIndex = data.indexOf('=');
+        Map<String, String> postData = new HashMap<>();
+        postData.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
+        HttpClientParams hcParams = new HttpClientParams();
+        hcParams.setSoTimeout(timeOut);
+        String expectedErrorMessage = "Simulated Exception";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
+
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpPost(urlString, data, timeOut));
+        assertEquals(expectedErrorMessage, exception.getMessage());
+    }
+}
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.NameValuePair;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class HttpCallDaoTest {
+
+    @InjectMocks
+    private HttpCallDao httpCallDao;
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private PostMethod postMethod;
+
+    @Test
+    void callHttpPost_successful() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        Map<String, String> queryData = new HashMap<>();
+        queryData.put("param1", "value1");
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
+
+        // Act
+        String result = httpCallDao.callHttpPost(urlString, queryData);
+
+        // Assert
+        assertEquals(expectedResponse, result);
+    }
+
+    @Test
+    void callHttpPost_exception() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        Map<String, String> queryData = new HashMap<>();
+        queryData.put("param1", "value1");
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedErrorMessage = "Simulated Exception";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
+
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCallDao.callHttpPost(urlString, queryData));
+        assertEquals(expectedErrorMessage, exception.getMessage());
+    }
+}
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpMethod;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.params.HttpClientParams;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class YourClassTest {
+
+    @InjectMocks
+    private YourClass yourClass;  // Replace 'YourClass' with the actual class containing 'callHttpPost' method.
+
+    @Mock
+    private HttpClient httpClient;
+
+    @Mock
+    private PostMethod postMethod;
+
+    @Test
+    void callHttpPost_successful() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        Map<String, String> queryData = new HashMap<>();
+        queryData.put("param1", "value1");
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedResponse = "MockedResponse";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenReturn(200);
+        when(postMethod.getResponseBodyAsString()).thenReturn(expectedResponse);
+
+        // Act
+        String result = yourClass.callHttpPost(urlString, queryData);
+
+        // Assert
+        assertEquals(expectedResponse, result);
+    }
+
+    @Test
+    void callHttpPost_exception() throws IOException {
+        // Arrange
+        String urlString = "https://example.com";
+        Map<String, String> queryData = new HashMap<>();
+        queryData.put("param1", "value1");
+        HttpClientParams hcParams = new HttpClientParams();
+        String expectedErrorMessage = "Simulated Exception";
+
+        when(httpClient.executeMethod(any(HttpMethod.class))).thenThrow(new HttpException(expectedErrorMessage));
+
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> yourClass.callHttpPost(urlString, queryData));
+        assertEquals(expectedErrorMessage, exception.getMessage());
     }
 }
