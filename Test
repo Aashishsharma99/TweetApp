@@ -1,83 +1,76 @@
-import org.dom4j.Document;
-import org.dom4j.Node;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 @ExtendWith({SpringExtension.class, MockitoExtension.class})
 @SpringBootTest
-class XpathValueFinderTest {
+class HttpCallerTest {
 
     @Mock
-    private Document document;
-
-    @Mock
-    private Node node;
+    private HttpCallDao httpCallDao; // Assuming you have a corresponding HttpCallDao class
 
     @InjectMocks
-    private XpathValueFinder xpathValueFinder;
+    private HttpCaller httpCaller;
 
     @Test
-    void findAttributeValue_attributeFound() {
+    void makeCall_successful() throws Exception {
         // Arrange
-        String attributeValue = "testAttribute";
-        String xPath = "//field[@name=\"" + attributeValue + "\"]/./@value";
-        String expectedValue = "MockedValue";
+        String urlString = "https://example.com";
+        String data = "key=value";
+        String expectedResponse = "MockedResponse";
 
         // Mocking behavior
-        when(document.selectSingleNode(xPath)).thenReturn(node);
-        when(node.getStringValue()).thenReturn(expectedValue);
+        when(httpCallDao.callHttpPost(eq(urlString), anyMap())).thenReturn(expectedResponse);
 
         // Act
-        String result = xpathValueFinder.findAttributeValue(document, attributeValue);
+        String result = httpCaller.makeCall(urlString, data);
 
         // Assert
-        assertEquals(expectedValue, result);
-        verify(document, times(1)).selectSingleNode(xPath);
-        verify(node, times(1)).getStringValue();
+        assertEquals(expectedResponse, result);
+        verify(httpCallDao, times(1)).callHttpPost(eq(urlString), anyMap());
     }
 
     @Test
-    void findAttributeValue_attributeNotFound() {
+    void makeCall_invalidData() throws Exception {
         // Arrange
-        String attributeValue = "nonexistentAttribute";
-        String xPath = "//field[@name=\"" + attributeValue + "\"]/./@value";
-
-        // Mocking behavior
-        when(document.selectSingleNode(xPath)).thenReturn(null);
+        String urlString = "https://example.com";
+        String data = "invalidData";
 
         // Act
-        String result = xpathValueFinder.findAttributeValue(document, attributeValue);
+        String result = httpCaller.makeCall(urlString, data);
 
         // Assert
-        assertEquals("", result);
-        verify(document, times(1)).selectSingleNode(xPath);
-        verifyNoInteractions(node); // No interactions with the Node mock
+        assertEquals("", result); // Since data is invalid, the result should be an empty string
+        verifyNoInteractions(httpCallDao); // No interactions with HttpCallDao in this case
     }
 
     @Test
-    void findAttributeValue_exceptionThrown() {
+    void makeCall_exceptionThrown() throws Exception {
         // Arrange
-        String attributeValue = "testAttribute";
-        String xPath = "//field[@name=\"" + attributeValue + "\"]/./@value";
+        String urlString = "https://example.com";
+        String data = "key=value";
         String errorMessage = "Simulated Exception";
 
         // Mocking behavior
-        when(document.selectSingleNode(xPath)).thenThrow(new RuntimeException(errorMessage));
+        when(httpCallDao.callHttpPost(eq(urlString), anyMap())).thenThrow(new RuntimeException(errorMessage));
 
         // Act
-        String result = xpathValueFinder.findAttributeValue(document, attributeValue);
+        String result = httpCaller.makeCall(urlString, data);
 
         // Assert
-        assertEquals("", result);
-        // Verify that the log.debug method is called when an exception is thrown
-        verify(xpathValueFinder.log).debug(contains("EXCEPTION: findAttributeValue()"), anyString());
+        assertEquals("", result); // Since an exception is thrown, the result should be an empty string
+        verify(httpCaller.log).info(contains("Aborted"), anyString()); // Verifying the log message for an aborted call
     }
 }
