@@ -1,86 +1,169 @@
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-@ExtendWith({SpringExtension.class, MockitoExtension.class})
+@ExtendWith(SpringExtension.class)
 @SpringBootTest
-class HttpCallerTest {
-
-    @Mock
-    private URL url;
-
-    @Mock
-    private URLConnection urlConnection;
-
-    @Mock
-    private OutputStreamWriter outputStreamWriter;
-
-    @Mock
-    private BufferedReader bufferedReader;
+class UniqueIdGeneratorTest {
 
     @InjectMocks
-    private HttpCaller httpCaller;
+    private UniqueIdGenerator uniqueIdGenerator;
 
     @Test
-    void makeCall_successful() throws Exception {
+    void getUniqId_successful() {
         // Arrange
-        String urlString = "https://example.com";
-        String data = "requestData";
-        String expectedResponse = "MockedResponse";
-
-        // Mocking behavior
-        when(url.openConnection()).thenReturn(urlConnection);
-        when(urlConnection.getOutputStream()).thenReturn(outputStreamWriter);
-        when(urlConnection.getInputStream()).thenReturn(bufferedReader);
-        when(bufferedReader.readLine()).thenReturn(expectedResponse, null);
+        System.setProperty("server.id", "01"); // Replace with the expected value for testing
+        Thread.currentThread().setName("TestThread"); // Replace with the expected value for testing
+        int totalUniqNosNeeded = 5;
 
         // Act
-        String result = httpCaller.makeCallOld(urlString, data);
+        List<String> uniqIds = uniqueIdGenerator.getUniqId(totalUniqNosNeeded);
 
         // Assert
-        assertEquals(expectedResponse, result);
-        verify(url, times(1)).openConnection();
-        verify(urlConnection, times(1)).setDoOutput(true);
-        verify(outputStreamWriter, times(1)).write(data);
-        verify(outputStreamWriter, times(1)).flush();
-        verify(bufferedReader, times(1)).readLine();
-        verify(outputStreamWriter, times(1)).close();
-        verify(bufferedReader, times(1)).close();
+        assertEquals(totalUniqNosNeeded, uniqIds.size());
+        for (String uniqId : uniqIds) {
+            // Validate the format of the generated unique ID
+            // You may need to adjust this based on the actual format in your implementation
+            assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
+            // Add more validations as needed
+        }
     }
 
     @Test
-    void makeCall_exceptionThrown() throws Exception {
+    void getUniqId_exception() {
         // Arrange
-        String urlString = "https://example.com";
-        String data = "requestData";
-        String errorMessage = "Simulated Exception";
+        System.setProperty("server.id", null); // Set server.id to null to simulate an exception
+        Thread.currentThread().setName(null); // Set thread name to null to simulate an exception
+        int totalUniqNosNeeded = 5;
 
-        // Mocking behavior
-        when(url.openConnection()).thenReturn(urlConnection);
-        when(urlConnection.getOutputStream()).thenReturn(outputStreamWriter);
-        when(urlConnection.getInputStream()).thenThrow(new RuntimeException(errorMessage));
+        // Act
+        List<String> uniqIds = uniqueIdGenerator.getUniqId(totalUniqNosNeeded);
 
-        // Act and Assert
-        Exception exception = assertThrows(Exception.class, () -> httpCaller.makeCallOld(urlString, data));
-        assertEquals(errorMessage, exception.getMessage());
+        // Assert
+        assertEquals(0, uniqIds.size()); // Since an exception is simulated, the list should be empty
+    }
+}
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
 
-        verify(url, times(1)).openConnection();
-        verify(urlConnection, times(1)).setDoOutput(true);
-        verify(outputStreamWriter, times(1)).write(data);
-        verify(outputStreamWriter, times(1)).flush();
-        verify(outputStreamWriter, times(1)).close();
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class UniqueIdGeneratorTest {
+
+    @InjectMocks
+    private UniqueIdGenerator uniqueIdGenerator;
+
+    @Test
+    void get21DigitUniqId_successful() {
+        // Arrange
+        System.setProperty("server.id", "01"); // Replace with the expected value for testing
+        Thread.currentThread().setName("TestThread"); // Replace with the expected value for testing
+        int totalUniqNosNeeded = 5;
+
+        // Act
+        List<String> uniqIds = uniqueIdGenerator.get21DigitUniqId(totalUniqNosNeeded);
+
+        // Assert
+        assertEquals(totalUniqNosNeeded, uniqIds.size());
+        for (String uniqId : uniqIds) {
+            // Validate the format of the generated unique ID
+            // You may need to adjust this based on the actual format in your implementation
+            assertEquals(21, uniqId.length()); // Assuming the length of the ID is 21 characters
+            // Add more validations as needed
+        }
+    }
+
+    @Test
+    void get21DigitUniqId_exception() {
+        // Arrange
+        System.setProperty("server.id", null); // Set server.id to null to simulate an exception
+        Thread.currentThread().setName(null); // Set thread name to null to simulate an exception
+        int totalUniqNosNeeded = 5;
+
+        // Act
+        List<String> uniqIds = uniqueIdGenerator.get21DigitUniqId(totalUniqNosNeeded);
+
+        // Assert
+        assertEquals(0, uniqIds.size()); // Since an exception is simulated, the list should be empty
+    }
+}
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(SpringExtension.class)
+@SpringBootTest
+class UniqueIdGeneratorTest {
+
+    @InjectMocks
+    private UniqueIdGenerator uniqueIdGenerator;
+
+    @Test
+    void getUniqId_successful() {
+        // Arrange
+        int totalUniqNosNeeded = 1;
+
+        // Act
+        String uniqId = uniqueIdGenerator.getUniqId();
+
+        // Assert
+        assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
+        // Add more validations as needed
+    }
+
+    @Test
+    void get21DigitUniqId_successful() {
+        // Arrange
+        int totalUniqNosNeeded = 1;
+
+        // Act
+        String uniqId = uniqueIdGenerator.get21DigitUniqId();
+
+        // Assert
+        assertEquals(21, uniqId.length()); // Assuming the length of the ID is 21 characters
+        // Add more validations as needed
+    }
+
+    @Test
+    void getUniqIds_successful() {
+        // Arrange
+        int totalUniqNosNeeded = 5;
+
+        // Act
+        List<String> uniqIds = uniqueIdGenerator.getUniqIds(totalUniqNosNeeded);
+
+        // Assert
+        assertEquals(totalUniqNosNeeded, uniqIds.size());
+        for (String uniqId : uniqIds) {
+            // Validate the format of the generated unique ID
+            // You may need to adjust this based on the actual format in your implementation
+            assertEquals(20, uniqId.length()); // Assuming the length of the ID is 20 characters
+            // Add more validations as needed
+        }
     }
 }
