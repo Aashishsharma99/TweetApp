@@ -4,14 +4,15 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith({SpringExtension.class, MockitoExtension.class})
@@ -19,7 +20,16 @@ import static org.mockito.Mockito.*;
 class HttpCallerTest {
 
     @Mock
-    private HttpCallDao httpCallDao; // Assuming you have a corresponding HttpCallDao class
+    private URL url;
+
+    @Mock
+    private URLConnection urlConnection;
+
+    @Mock
+    private OutputStreamWriter outputStreamWriter;
+
+    @Mock
+    private BufferedReader bufferedReader;
 
     @InjectMocks
     private HttpCaller httpCaller;
@@ -28,49 +38,49 @@ class HttpCallerTest {
     void makeCall_successful() throws Exception {
         // Arrange
         String urlString = "https://example.com";
-        String data = "key=value";
+        String data = "requestData";
         String expectedResponse = "MockedResponse";
 
         // Mocking behavior
-        when(httpCallDao.callHttpPost(eq(urlString), anyMap())).thenReturn(expectedResponse);
+        when(url.openConnection()).thenReturn(urlConnection);
+        when(urlConnection.getOutputStream()).thenReturn(outputStreamWriter);
+        when(urlConnection.getInputStream()).thenReturn(bufferedReader);
+        when(bufferedReader.readLine()).thenReturn(expectedResponse, null);
 
         // Act
-        String result = httpCaller.makeCall(urlString, data);
+        String result = httpCaller.makeCallOld(urlString, data);
 
         // Assert
         assertEquals(expectedResponse, result);
-        verify(httpCallDao, times(1)).callHttpPost(eq(urlString), anyMap());
-    }
-
-    @Test
-    void makeCall_invalidData() throws Exception {
-        // Arrange
-        String urlString = "https://example.com";
-        String data = "invalidData";
-
-        // Act
-        String result = httpCaller.makeCall(urlString, data);
-
-        // Assert
-        assertEquals("", result); // Since data is invalid, the result should be an empty string
-        verifyNoInteractions(httpCallDao); // No interactions with HttpCallDao in this case
+        verify(url, times(1)).openConnection();
+        verify(urlConnection, times(1)).setDoOutput(true);
+        verify(outputStreamWriter, times(1)).write(data);
+        verify(outputStreamWriter, times(1)).flush();
+        verify(bufferedReader, times(1)).readLine();
+        verify(outputStreamWriter, times(1)).close();
+        verify(bufferedReader, times(1)).close();
     }
 
     @Test
     void makeCall_exceptionThrown() throws Exception {
         // Arrange
         String urlString = "https://example.com";
-        String data = "key=value";
+        String data = "requestData";
         String errorMessage = "Simulated Exception";
 
         // Mocking behavior
-        when(httpCallDao.callHttpPost(eq(urlString), anyMap())).thenThrow(new RuntimeException(errorMessage));
+        when(url.openConnection()).thenReturn(urlConnection);
+        when(urlConnection.getOutputStream()).thenReturn(outputStreamWriter);
+        when(urlConnection.getInputStream()).thenThrow(new RuntimeException(errorMessage));
 
-        // Act
-        String result = httpCaller.makeCall(urlString, data);
+        // Act and Assert
+        Exception exception = assertThrows(Exception.class, () -> httpCaller.makeCallOld(urlString, data));
+        assertEquals(errorMessage, exception.getMessage());
 
-        // Assert
-        assertEquals("", result); // Since an exception is thrown, the result should be an empty string
-        verify(httpCaller.log).info(contains("Aborted"), anyString()); // Verifying the log message for an aborted call
+        verify(url, times(1)).openConnection();
+        verify(urlConnection, times(1)).setDoOutput(true);
+        verify(outputStreamWriter, times(1)).write(data);
+        verify(outputStreamWriter, times(1)).flush();
+        verify(outputStreamWriter, times(1)).close();
     }
 }
