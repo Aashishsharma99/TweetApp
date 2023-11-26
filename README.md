@@ -1,83 +1,105 @@
 package com.vzw.cc.util;
 
-import com.verizon.onemsg.omppservice.util.mail.MailBoxConnector;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.springframework.stereotype.Component;
- 
-
-
-
 
 @Component
-public class HttpCaller
+public class UniqueIdGenerator
 {
-	private static Logger log = LogManager.getLogger(HttpCaller.class.getName());	  
-  public static String makeCall(String urlString, String data) throws Exception {
-    log.info("makeCall(): STARTED. Using HttpCallDao url=" + urlString);
-    log.info("query data=" + data);
-    String totalResponse = "";
-    int equalIndex = -1;
-    if ((equalIndex = data.indexOf('=')) != -1) {
-      HashMap<String, String> hm = new HashMap<String, String>();
-      hm.put(data.substring(0, equalIndex), data.substring(equalIndex + 1, data.length()));
-      totalResponse = HttpCallDao.callHttpPost(urlString, hm);
-    } else {
-      log.info("makeCall(): Aborted: xmlreqdoc= is required in data");
-    }  log.info("makeCall(): DONE.");
-    return totalResponse;
+  private static long oldTime = 0L;
+  private static long offset = 0L;
+
+  
+  private static List<String> getUniqId(int totalUniqNosNeeded) {
+    String currTime = String.valueOf(System.currentTimeMillis());
+    String currThread = Thread.currentThread().getName();
+    
+    String serverId = System.getProperty("server.id");
+    
+    serverId = getLastTwoDigits(serverId);
+    currThread = getLastTwoDigits(currThread);
+    List<String> uniqIds = new ArrayList<String>();
+    
+    for (int index = 0; index < totalUniqNosNeeded; index++) {
+      
+      if (System.currentTimeMillis() != oldTime) {
+        
+        currTime = String.valueOf(System.currentTimeMillis());
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + "00");
+        offset = 1L;
+        oldTime = System.currentTimeMillis();
+      } else {
+        
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + ((offset % 10L == offset) ? ("0" + offset) : String.valueOf(offset)));
+        offset++;
+      } 
+    } 
+    
+    return uniqIds;
+  }
+
+  
+  private static List<String> get21DigitUniqId(int totalUniqNosNeeded) {
+    String currTime = String.valueOf(System.nanoTime());
+    String currThread = Thread.currentThread().getName();
+    
+    String serverId = System.getProperty("server.id");
+    
+    serverId = getLastTwoDigits(serverId);
+    currThread = getLastTwoDigits(currThread);
+    List<String> uniqIds = new ArrayList<String>();
+    
+    for (int index = 0; index < totalUniqNosNeeded; index++) {
+      
+      if (System.nanoTime() != oldTime) {
+        
+        currTime = String.valueOf(System.nanoTime());
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + "00");
+        offset = 1L;
+        oldTime = System.nanoTime();
+      } else {
+        
+        uniqIds.add(String.valueOf(currTime) + currThread + serverId + ((offset % 10L == offset) ? ("0" + offset) : String.valueOf(offset)));
+        offset++;
+      } 
+    } 
+    
+    return uniqIds;
+  }
+
+  
+  private static String getLastTwoDigits(String id) {
+    if (id != null && Character.isDigit(id.charAt(id.length() - 1))) {
+      if (Character.isDigit(id.charAt(id.length() - 2))) {
+        return id.substring(id.length() - 2);
+      }
+      return "0" + id.substring(id.length() - 1);
+    } 
+    return "00";
   }
 
 
-
-
-
-
+  
+  public static String getUniqId() { return (String)getUniqId(1).get(0); }
 
 
 
   
-  public static String makeCallOld(String urlString, String data) throws Exception {
-    log.info("makeCall(): STARTED. url=" + urlString);
-    log.info("query data=" + data);
-    String totalResponse = "";
-    String responseReceived = "";
-    
-    try {
-      URL url = new URL(urlString);
-      URLConnection conn = url.openConnection();
-      conn.setDoOutput(true);
-      OutputStreamWriter wr = new OutputStreamWriter(conn.getOutputStream());
-      wr.write(data);
-      wr.flush();
+  public static String get21DigitUniqId() { return (String)get21DigitUniqId(1).get(0); }
 
-      
-      StringBuffer sb = new StringBuffer();
-      BufferedReader rd = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-      
-      while ((responseReceived = rd.readLine()) != null) {
-        sb.append(responseReceived);
-      }
-      wr.close();
-      rd.close();
-      
-      totalResponse = sb.toString();
-    }
-    catch (Exception e) {
-      log.warn("makeCall(): EXCEPTION: " + e.toString());
-      responseReceived = e.toString();
-      throw e;
-    } 
-    log.info("makeCall(): DONE.");
 
-    
-    return totalResponse;
+
+  
+  public static List<String> getUniqIds(int totalUniqNosNeeded) { return getUniqId(totalUniqNosNeeded); }
+
+  
+  public static void main(String[] args) {
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
+    System.out.println(getUniqId());
   }
 }
