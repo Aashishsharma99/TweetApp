@@ -1,83 +1,148 @@
 package com.verizon.onemsg.omppservice.handler;
 
-import javax.xml.xpath.XPath;
-import javax.xml.xpath.XPathConstants;
-import javax.xml.xpath.XPathExpression;
+import javax.annotation.PostConstruct;
 import javax.xml.xpath.XPathFactory;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import com.verizon.onemsg.omppservice.properties.AppProperties;
-import com.verizon.onemsg.omppservice.receiver.MDNChangeReceiver;
-import com.verizon.onemsg.omppservice.service.CommonProcessor;
+import com.verizon.onemsg.omppservice.constants.AppConstants;
+import com.verizon.onemsg.omppservice.dao.CommonAuditDao;
+import com.verizon.onemsg.omppservice.receiver.MDNTransferReceiver;
+import com.verizon.onemsg.omppservice.service.MDNCleanupService;
 import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
+import com.verizon.onemsg.omppservice.util.XmlUtil;
+import com.vzw.cc.valueobjects.AuditInfo;
 
 @Service
-public class FamilyBaseSFOHandler {
-	private Logger log = LogManager.getLogger(FamilyBaseSFOHandler.class.getName());
+public class MDBtransferHandler {
+	
+	private Logger log = LogManager.getLogger(MDBtransferHandler.class.getName());
+
+	VisionAlertsProcessor processor = null;
 	
 	@Autowired
-	AppProperties appProps;
+	CommonAuditDao auditdao;
 	
-	@Autowired
-	CommonProcessor processor;
 	
-	public String process(Document document, String status) {
-
-		try {
-
-			XPath xpath = XPathFactory.newInstance().newXPath();
-			XPathExpression expr = xpath.compile("//EDR_CPF//CHANGE_DATA_FEATURES//SFO_ID");
-			NodeList nodes = (NodeList) expr.evaluate(document, XPathConstants.NODESET);
-			
-			log.info("Inside FamilyBaseSFOBean::process()");			
-		
-			NodeList childNodes;
-			
-			if (nodes != null && nodes.getLength() > 0) {
-
-				for (int i = 0; i < nodes.getLength(); i++) {
-					if (nodes.item(i).hasChildNodes()) {
-						childNodes = nodes.item(i).getChildNodes();
-						for (int j = 0; childNodes != null && j < childNodes.getLength(); j++) {
-							if ("SFO_ID".equalsIgnoreCase(childNodes.item(j).getNodeName())
-									&& appProps.getProperty("FAMILY_BASE_SFO_ID")
-											.equalsIgnoreCase(childNodes.item(j).getTextContent())) {
-								log.info("Found matching SFO_ID for family base 2 feature");
-								for (int k = 0; childNodes != null && k < childNodes.getLength(); k++) {
-									if (appProps.getProperty("FAMILY_BASE_ADD_STR")
-											.equalsIgnoreCase(childNodes.item(k).getNodeName())) {
-										// trigger SMS if SFO_ID is 78460 and
-										// has effective date tag
-										log.info("Found effective date tag for SFO_ID triggering SMS");
-										String mtn = VisionAlertsProcessor.getNode(document,
-												XPathFactory.newInstance().newXPath(),
-												"//EDR_CPF//CHANGE_DATA_FEATURES//TR_KEY//TR_MDN//text()");
-
-										return processor.triggerSMS(Long.parseLong(mtn),
-												appProps.getProperty("FAMILY_BASE_SMS_REQ_TYPE"));
-										
-									}
-								}
-							}
-							log.info("Node:" + childNodes.item(j).getNodeName() + " Value:"
-									+ childNodes.item(j).getTextContent());
-						}
-					}
-				}
-				
-			
-			}			
-			
-		} catch (Exception e) {
-			log.error("FamilyBaseAlert", "FamilyBaseSFOBean", "process", e.getMessage(), "FATAL", e);
-		}
-
-		return "P";
+	public MDBtransferHandler(@Lazy VisionAlertsProcessor processor){
+		this.processor = processor;
 	}
+	
+	public String process(Document transferDocument, String status){
+		
+		String processStatus = null;		
+		AuditInfo auditInfo = null;		
+		long time = System.currentTimeMillis();
+		if(status == null)
+			status = "A";
+		
+		try {			
+					
+			String billingSystemId = (VisionAlertsProcessor.getNode(transferDocument,  
+																	XPathFactory.newInstance().newXPath(), 
+																	"//EDR_CPF//BILLING_SYSTEM_ID//text()"));
+			//Audit Entries	
+			auditInfo = auditdao.createAuditMap(XmlUtil.getXml(transferDocument), AppConstants.VISION_CLIENTID, "MDN_TRANSFER");
+			auditInfo.setTrns_type("TRN");
+			auditInfo.setRequest_TS(auditdao.getAuditDate());
+			auditInfo.setStatus(status);
+			auditInfo.setFlexField1(processor.getBillSystem(Integer.parseInt(billingSystemId)));		
+			
+			Node node = transferDocument.getFirstChild();
+			NodeList nodeList = node.getChildNodes();
+			
+			for (int i=0; i < nodeList.getLength(); i++) {
+				node = nodeList.item(i);
+	            if (node.getNodeName().equals("TRANSFER"))
+	            	processStatus = processor.processTransfer(auditInfo, node);
+	        }		
+		} catch (Exception e) {			
+			log.error("CustActivityTransfer", "MDNTransferBean", "process", e.getMessage(), "ERROR", e);
+			processStatus = status;
+		}  finally{	
+			if (auditInfo != null) {
+				auditInfo.setResponse_TS(auditdao.getAuditDate());
+				auditInfo.setResponse_time(System.currentTimeMillis() - time);
+				auditInfo.setStatus(processStatus);
+				auditdao.submitAduitMessage(auditInfo);
+			}
+		}
+		return processStatus;
+	}
+}
+
+
+
+package com.verizon.onemsg.omppservice.handler;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import org.junit.jupiter.api.Test;
+import org.junit.runner.RunWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.Spy;
+import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.Node;
+import com.verizon.onemsg.omppservice.dao.CommonAuditDao;
+import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
+import com.vzw.cc.valueobjects.AuditInfo;
+
+@RunWith(MockitoJUnitRunner.class)
+@SpringJUnitConfig
+class MDBtransferHandlerTest {
+	
+	@Spy
+	@InjectMocks
+	MDBtransferHandler mdbtransferHandler;
+	
+	@Mock
+	VisionAlertsProcessor processor;
+	@Mock
+	Document transferDocument;
+	@Mock
+	CommonAuditDao auditdaoMock;
+	@Mock
+	AuditInfo auditInfo;
+	@Mock
+	NodeList nodeList;
+	@Mock
+	Node node;
+	
+	@Test
+	void testMDBtransferHandler() {
+		MDBtransferHandler mdbtransferHandler = new MDBtransferHandler(processor);
+		
+	}
+
+	@Test
+	void testProcess() {
+		int i =0;
+		mdbtransferHandler.auditdao = auditdaoMock;
+		when(auditdaoMock.createAuditMap(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(auditInfo);
+		
+		when(processor.getBillSystem(Mockito.anyInt())).thenReturn("FlexField1");
+		when(transferDocument.getFirstChild()).thenReturn(node);
+		when(node.getChildNodes()).thenReturn(nodeList);
+		
+		
+		
+		mdbtransferHandler.process(transferDocument, "OK");
+		
+		mdbtransferHandler.process(transferDocument, null);
+	}
+
 }
