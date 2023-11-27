@@ -1,148 +1,84 @@
-package com.verizon.onemsg.omppservice.handler;
+package com.verizon.onemsg.omppservice.service;
 
-import javax.annotation.PostConstruct;
+import java.io.ByteArrayInputStream;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathFactory;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.xmlbeans.XmlOptions;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import com.verizon.onemsg.omppservice.beans.Mdn;
 import com.verizon.onemsg.omppservice.constants.AppConstants;
-import com.verizon.onemsg.omppservice.dao.CommonAuditDao;
-import com.verizon.onemsg.omppservice.receiver.MDNTransferReceiver;
-import com.verizon.onemsg.omppservice.service.MDNCleanupService;
-import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
-import com.verizon.onemsg.omppservice.util.XmlUtil;
+import com.verizon.onemsg.omppservice.dao.OmppsLdapDAO;
+import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.verizon.onemsg.omppservice.util.CommonUtils;
+import com.verizon.onemsg.omppservice.util.HttpCall;
+import com.verizon.onemsg.omppservice.util.mail.MailBoxConnector;
+import com.vzw.cc.cpc.xmlbeans.request.profileUpdate.Account;
+import com.vzw.cc.cpc.xmlbeans.request.profileUpdate.Mobile;
+import com.vzw.cc.cpc.xmlbeans.request.profileUpdate.ProfileUpdateRequest;
+import com.vzw.cc.cpc.xmlbeans.request.profileUpdate.ProfileUpdateRequestDocument;
 import com.vzw.cc.valueobjects.AuditInfo;
 
-@Service
-public class MDBtransferHandler {
-	
-	private Logger log = LogManager.getLogger(MDBtransferHandler.class.getName());
+/**
+ * @author c0peesr
+ *
+ *
+ *         return code String value varies for different process A -- Process
+ *         just Initiated D -- MDN Added to Disconnect H -- Folder copied
+ *         successfully K -- MDN deleted from customer branch Y -- MDN add
+ *         request sent successfully
+ *
+ */
+@Component
+public class VisionAlertsProcessor {
 
-	VisionAlertsProcessor processor = null;
-	
+	@Value("${APP_ID}")
+	private static String appId;
+
+	@Value("${ENABLE_OU_DISCONNECT_FLAG}")
+	boolean enableOuDisconnectFlag;
+
+	private static Logger log = LogManager.getLogger(VisionAlertsProcessor.class.getName());
+
+	/*
+	 * @Autowired
+	 * 
+	 * @Qualifier("ldapTemplatePS") LdapTemplate ldapTemplatePS;
+	 */
+
 	@Autowired
-	CommonAuditDao auditdao;
-	
-	
-	public MDBtransferHandler(@Lazy VisionAlertsProcessor processor){
-		this.processor = processor;
-	}
-	
-	public String process(Document transferDocument, String status){
-		
-		String processStatus = null;		
-		AuditInfo auditInfo = null;		
-		long time = System.currentTimeMillis();
-		if(status == null)
-			status = "A";
-		
-		try {			
-					
-			String billingSystemId = (VisionAlertsProcessor.getNode(transferDocument,  
-																	XPathFactory.newInstance().newXPath(), 
-																	"//EDR_CPF//BILLING_SYSTEM_ID//text()"));
-			//Audit Entries	
-			auditInfo = auditdao.createAuditMap(XmlUtil.getXml(transferDocument), AppConstants.VISION_CLIENTID, "MDN_TRANSFER");
-			auditInfo.setTrns_type("TRN");
-			auditInfo.setRequest_TS(auditdao.getAuditDate());
-			auditInfo.setStatus(status);
-			auditInfo.setFlexField1(processor.getBillSystem(Integer.parseInt(billingSystemId)));		
-			
-			Node node = transferDocument.getFirstChild();
-			NodeList nodeList = node.getChildNodes();
-			
-			for (int i=0; i < nodeList.getLength(); i++) {
-				node = nodeList.item(i);
-	            if (node.getNodeName().equals("TRANSFER"))
-	            	processStatus = processor.processTransfer(auditInfo, node);
-	        }		
-		} catch (Exception e) {			
-			log.error("CustActivityTransfer", "MDNTransferBean", "process", e.getMessage(), "ERROR", e);
-			processStatus = status;
-		}  finally{	
-			if (auditInfo != null) {
-				auditInfo.setResponse_TS(auditdao.getAuditDate());
-				auditInfo.setResponse_time(System.currentTimeMillis() - time);
-				auditInfo.setStatus(processStatus);
-				auditdao.submitAduitMessage(auditInfo);
-			}
-		}
-		return processStatus;
-	}
-}
+	OmppsLdapDAO omppsLdapDao;
 
+	@Autowired
+	AppProperties prop;
 
+	@Autowired
+	CommonUtils commonUtils;
 
-package com.verizon.onemsg.omppservice.handler;
+	@Autowired
+	HttpCall httpCall;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+	private static final String APPID = appId;
 
-import org.junit.jupiter.api.Test;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.Spy;
-import org.mockito.junit.MockitoJUnitRunner;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.w3c.dom.Document;
-import org.w3c.dom.NodeList;
-import org.w3c.dom.Node;
-import com.verizon.onemsg.omppservice.dao.CommonAuditDao;
-import com.verizon.onemsg.omppservice.service.VisionAlertsProcessor;
-import com.vzw.cc.valueobjects.AuditInfo;
-
-@RunWith(MockitoJUnitRunner.class)
-@SpringJUnitConfig
-class MDBtransferHandlerTest {
-	
-	@Spy
-	@InjectMocks
-	MDBtransferHandler mdbtransferHandler;
-	
-	@Mock
-	VisionAlertsProcessor processor;
-	@Mock
-	Document transferDocument;
-	@Mock
-	CommonAuditDao auditdaoMock;
-	@Mock
-	AuditInfo auditInfo;
-	@Mock
-	NodeList nodeList;
-	@Mock
-	Node node;
-	
-	@Test
-	void testMDBtransferHandler() {
-		MDBtransferHandler mdbtransferHandler = new MDBtransferHandler(processor);
-		
+	public VisionAlertsProcessor() {
+		// springLdapDao = (SpringLdapDAO)context.getBean("springLdapDao");
 	}
 
-	@Test
-	void testProcess() {
-		int i =0;
-		mdbtransferHandler.auditdao = auditdaoMock;
-		when(auditdaoMock.createAuditMap(Mockito.anyString(), Mockito.anyString(), Mockito.anyString())).thenReturn(auditInfo);
-		
-		when(processor.getBillSystem(Mockito.anyInt())).thenReturn("FlexField1");
-		when(transferDocument.getFirstChild()).thenReturn(node);
-		when(node.getChildNodes()).thenReturn(nodeList);
-		
-		
-		
-		mdbtransferHandler.process(transferDocument, "OK");
-		
-		mdbtransferHandler.process(transferDocument, null);
-	}
+	public String processTransfer(AuditInfo auditInfo, Node node) {
 
-}
+		String billSystem = auditInfo.getFlexField1(); // billSystemId.
+		String processStatus = auditInfo.getStatus();
