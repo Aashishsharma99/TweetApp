@@ -1,102 +1,41 @@
-import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
-import com.vzw.cc.valueobjects.AuditInfo;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
+package com.verizon.onemsg.omppservice.receiver;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+import org.w3c.dom.Document;
+import com.verizon.onemsg.omppservice.constants.AppConstants;
+import com.verizon.onemsg.omppservice.service.ActivateProcessor;
+import com.verizon.onemsg.omppservice.util.XmlUtil;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+@Service	
+public class MDNActivateReceiver {
+	private Logger log = LogManager.getLogger(MDNActivateReceiver.class.getName());
+	
+	//@Autowired
+	ActivateProcessor processor;
+	
+	public MDNActivateReceiver(@Lazy ActivateProcessor processor){
+		this.processor = processor;
+	}
+	
+	 public void onMessage(String message) {
+			String status = null;
+			try {
+				//String txtMsg = ((TextMessage) message).getText();
+				String txtMsg = message;
+				log.debug("Request XML:" + txtMsg);
+				Document doc = XmlUtil.loadXMLFromString(txtMsg);
+				
+				status = processor.processActivate(doc, AppConstants.Processes.ACTIVATION);
+					log.info("ActivateProcessor completed with status :: " + status);				
+										
+				
+			} catch (Throwable e) {
+				
+				log.error("Vision Activities", "CustActivityActivateMDB", "onMessage", e.getMessage(), "Error", e);			
+			}
 
-@ExtendWith(MockitoExtension.class)
-@SpringBootTest
-@TestPropertySource(properties = {
-        "BOS_AUTH_USERNAME=testUser",
-        "BOS_AUTH_PASSWORD=testPassword",
-        "BOS_PC_SERVICES_HTTP_TIMEOUT=5000",
-        "BOS_PC_SERVICE_ACTIVATE_ENDPOINT=http://activateEndpoint",
-        "BOS_PC_SERVICE_DEACTIVATE_ENDPOINT=http://deactivateEndpoint",
-        "APP_ID=testAppId",
-        "ENV=testEnvironment"
-})
-class CommonUtilsTest {
+}
 
-    @Value("${BOS_AUTH_USERNAME}")
-    private String bosUserName;
-
-    @Value("${BOS_AUTH_PASSWORD}")
-    private String bosPassword;
-
-    @Value("${BOS_PC_SERVICES_HTTP_TIMEOUT}")
-    private String bosBosPcHttpTimeout;
-
-    @Value("${BOS_PC_SERVICE_ACTIVATE_ENDPOINT}")
-    private String bosPcServiceActivateEndpoint;
-
-    @Value("${BOS_PC_SERVICE_DEACTIVATE_ENDPOINT}")
-    private String bosPcServiceDeactivateEndPoint;
-
-    @Value("${APP_ID}")
-    private String appId;
-
-    @Value("${ENV}")
-    private String environment;
-
-    @Mock
-    private HttpCall httpCall;
-
-    @Mock
-    private AppProperties props;
-
-    @InjectMocks
-    private CommonUtils commonUtils;
-
-    @Test
-    void makeCallToBOSPreferenceCenter_activate_shouldReturnStatusP() throws Exception {
-        // Arrange
-        BOSAccountBean bean = new BOSAccountBean();
-        AuditInfo auditInfo = new AuditInfo();
-        when(httpCall.submitJSONToUrl(anyString(), anyString(), anyInt(), anyString())).thenReturn("200");
-
-        // Act
-        String result = commonUtils.makeCallToBOSPreferenceCenter("ACTIVATE", bean, auditInfo);
-
-        // Assert
-        assertEquals("P", result);
-    }
-
-    @Test
-    void makeCallToBOSPreferenceCenter_deactivate_shouldReturnStatusP() throws Exception {
-        // Arrange
-        BOSAccountBean bean = new BOSAccountBean();
-        AuditInfo auditInfo = new AuditInfo();
-        when(httpCall.submitJSONToUrl(anyString(), anyString(), anyInt(), anyString())).thenReturn("200");
-
-        // Act
-        String result = commonUtils.makeCallToBOSPreferenceCenter("DEACTIVATE", bean, auditInfo);
-
-        // Assert
-        assertEquals("P", result);
-    }
-
-    @Test
-    void makeCallToBOSPreferenceCenter_httpCallReturnsNon200_shouldReturnStatusF() throws Exception {
-        // Arrange
-        BOSAccountBean bean = new BOSAccountBean();
-        AuditInfo auditInfo = new AuditInfo();
-        when(httpCall.submitJSONToUrl(anyString(), anyString(), anyInt(), anyString())).thenReturn("404");
-
-        // Act
-        String result = commonUtils.makeCallToBOSPreferenceCenter("ACTIVATE", bean, auditInfo);
-
-        // Assert
-        assertEquals("F", result);
-    }
-
-    // Add more test cases as needed
 }
