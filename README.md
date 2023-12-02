@@ -1,64 +1,69 @@
-package com.verizon.onemsg.omppservice.util;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.sql.Clob;
-import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.List;
-
-/*
- * Created on Aug 1, 2007
- *
- * TODO To change the template for this generated file go to
- * Window - Preferences - Java - Code Style - Code Templates
- */
-
-import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
-import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
-import com.verizon.onemsg.omppservice.beans.XSLBean;
-import com.verizon.onemsg.omppservice.entity.XSLTransformerEntity;
 import com.verizon.onemsg.omppservice.properties.AppProperties;
-import com.vzw.cc.valueobjects.AuditInfo;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
-/**
- * @author beherp
- *
- */
-@Component
-public class CommonUtils {	
-public boolean  connectToSunMsgServer(final String mailhost) {
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
+class CommonUtilsTest {
 
-		boolean connect = false;
+    @Mock
+    private AppProperties appProperties;
 
-		String env = environment;
-		
-		if ("prod".equalsIgnoreCase(env) && mailhost != null) {
+    @InjectMocks
+    private CommonUtils commonUtils;
 
-			if (mailhost.contains(props.getProperty("PROD_EAST_MAILHOST_PREFIX"))
-					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "ON"))) {
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.initMocks(this);
+    }
 
-				connect = true;
+    @Test
+    void connectToSunMsgServer_whenEnvironmentIsNotProd_shouldReturnFalse() {
+        // Arrange
+        when(appProperties.getProperty("PROD_EAST_MAILHOST_PREFIX")).thenReturn("east");
+        when(appProperties.getProperty("PROD_WEST_MAILHOST_PREFIX")).thenReturn("west");
 
-			} else if (mailhost.contains(props.getProperty("PROD_WEST_MAILHOST_PREFIX"))
-					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "ON"))) {
+        // Act
+        boolean result = commonUtils.connectToSunMsgServer("east-mailhost");
 
-				connect = true;
-			}
-		}
+        // Assert
+        assertFalse(result);
+    }
 
-		return connect;
-	}
+    @Test
+    void connectToSunMsgServer_whenEnvironmentIsProdAndConnectEnabledForEastMailhost_shouldReturnTrue() {
+        // Arrange
+        when(appProperties.getProperty("PROD_EAST_MAILHOST_PREFIX")).thenReturn("east");
+        when(appProperties.getProperty("PROD_WEST_MAILHOST_PREFIX")).thenReturn("west");
+        when(appProperties.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "OFF")).thenReturn("ON");
+        when(appProperties.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "OFF")).thenReturn("OFF");
+
+        // Act
+        boolean result = commonUtils.connectToSunMsgServer("east-mailhost");
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void connectToSunMsgServer_whenEnvironmentIsProdAndConnectEnabledForWestMailhost_shouldReturnTrue() {
+        // Arrange
+        when(appProperties.getProperty("PROD_EAST_MAILHOST_PREFIX")).thenReturn("east");
+        when(appProperties.getProperty("PROD_WEST_MAILHOST_PREFIX")).thenReturn("west");
+        when(appProperties.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "OFF")).thenReturn("OFF");
+        when(appProperties.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "OFF")).thenReturn("ON");
+
+        // Act
+        boolean result = commonUtils.connectToSunMsgServer("west-mailhost");
+
+        // Assert
+        assertTrue(result);
+    }
+
+    // Add more test cases for other scenarios as needed...
+}
