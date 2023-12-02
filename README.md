@@ -1,58 +1,64 @@
-import com.verizon.onemsg.omppservice.constants.AppConstants;
-import com.verizon.onemsg.omppservice.service.ActivateProcessor;
-import com.verizon.onemsg.omppservice.util.XmlUtil;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.w3c.dom.Document;
+package com.verizon.onemsg.omppservice.util;
 
-import static org.mockito.Mockito.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.StringWriter;
+import java.sql.Clob;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.List;
 
-@ExtendWith(MockitoExtension.class)
-class MDNActivateReceiverTest {
+/*
+ * Created on Aug 1, 2007
+ *
+ * TODO To change the template for this generated file go to
+ * Window - Preferences - Java - Code Style - Code Templates
+ */
 
-    @Mock
-    private ActivateProcessor processor;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-    @Mock
-    private XmlUtil xmlUtil;
+import com.verizon.onemsg.omppservice.beans.BOSAccountBean;
+import com.verizon.onemsg.omppservice.beans.XSLBean;
+import com.verizon.onemsg.omppservice.entity.XSLTransformerEntity;
+import com.verizon.onemsg.omppservice.properties.AppProperties;
+import com.vzw.cc.valueobjects.AuditInfo;
 
-    @InjectMocks
-    private MDNActivateReceiver mdnActivateReceiver;
+/**
+ * @author beherp
+ *
+ */
+@Component
+public class CommonUtils {	
+public boolean  connectToSunMsgServer(final String mailhost) {
 
-    @Test
-    void onMessage_shouldProcessActivateAndLogInfo() {
-        // Arrange
-        String message = "yourTestMessage";
-        Document doc = mock(Document.class);
-        when(xmlUtil.loadXMLFromString(message)).thenReturn(doc);
-        when(processor.processActivate(doc, AppConstants.Processes.ACTIVATION)).thenReturn("success");
 
-        // Act
-        mdnActivateReceiver.onMessage(message);
+		boolean connect = false;
 
-        // Assert
-        verify(processor).processActivate(doc, AppConstants.Processes.ACTIVATION);
-        // Add more assertions as needed
-    }
+		String env = environment;
+		
+		if ("prod".equalsIgnoreCase(env) && mailhost != null) {
 
-    @Test
-    void onMessage_shouldLogErrorIfExceptionThrown() {
-        // Arrange
-        String message = "yourTestMessage";
-        when(xmlUtil.loadXMLFromString(message)).thenThrow(new RuntimeException("Simulated exception"));
+			if (mailhost.contains(props.getProperty("PROD_EAST_MAILHOST_PREFIX"))
+					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_EAST", "ON"))) {
 
-        // Act
-        mdnActivateReceiver.onMessage(message);
+				connect = true;
 
-        // Assert
-        // Verify that log.error is called with the expected parameters
-        // For example, you can use ArgumentMatchers.eq for matching specific arguments
-        verify(log).error(eq("Vision Activities"), eq("CustActivityActivateMDB"), eq("onMessage"),
-                anyString(), eq("Error"), any(Throwable.class));
-    }
+			} else if (mailhost.contains(props.getProperty("PROD_WEST_MAILHOST_PREFIX"))
+					&& "ON".equals(props.getProperty("CONNECT_TO_SUN_MESSAGE_SERVER_WEST", "ON"))) {
 
-    // Add more test cases as needed
-}
+				connect = true;
+			}
+		}
+
+		return connect;
+	}
